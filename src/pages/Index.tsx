@@ -1,12 +1,23 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { Header } from "@/components/Header";
+import { ProductionForm } from "@/components/ProductionForm";
+import { ProductionTable } from "@/components/ProductionTable";
+import { useProductionRecords } from "@/hooks/useProductionRecords";
 
 const Index = () => {
+  const { records, addRecord, deleteRecord } = useProductionRecords();
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen bg-background">
+      <Header />
+      
+      <main className="container mx-auto px-4 py-8 space-y-8">
+        <ProductionForm onSubmit={addRecord} />
+        <ProductionTable records={records} onDelete={deleteRecord} />
+      </main>
+
+      <footer className="py-6 text-center text-muted-foreground text-sm">
+        <p>© {new Date().getFullYear()} Farinheira Vô Jorge LTDA - Sistema de Controle</p>
+      </footer>
     </div>
   );
 };
