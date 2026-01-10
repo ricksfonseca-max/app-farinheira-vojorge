@@ -7,9 +7,10 @@ import type { ProductionRecord } from "@/types/production";
 interface ProductionTableProps {
   records: ProductionRecord[];
   onDelete: (id: string) => void;
+  canDelete?: boolean;
 }
 
-export function ProductionTable({ records, onDelete }: ProductionTableProps) {
+export function ProductionTable({ records, onDelete, canDelete = false }: ProductionTableProps) {
   const formatDate = (dateString: string) => {
     const [year, month, day] = dateString.split('-');
     return `${day}/${month}`;
@@ -38,13 +39,15 @@ export function ProductionTable({ records, onDelete }: ProductionTableProps) {
                 <TableHead className="font-semibold text-foreground">Tipo Farinha</TableHead>
                 <TableHead className="font-semibold text-foreground">Peneira</TableHead>
                 <TableHead className="font-semibold text-foreground">Responsável</TableHead>
-                <TableHead className="font-semibold text-foreground w-16">Ações</TableHead>
+                {canDelete && (
+                  <TableHead className="font-semibold text-foreground w-16">Ações</TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
               {records.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={canDelete ? 8 : 7} className="text-center py-8 text-muted-foreground">
                     Nenhum registro encontrado. Adicione o primeiro registro acima.
                   </TableCell>
                 </TableRow>
@@ -66,16 +69,18 @@ export function ProductionTable({ records, onDelete }: ProductionTableProps) {
                     </TableCell>
                     <TableCell>{record.peneira}</TableCell>
                     <TableCell className="text-muted-foreground">{record.responsavel}</TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onDelete(record.id)}
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </TableCell>
+                    {canDelete && (
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onDelete(record.id)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))
               )}

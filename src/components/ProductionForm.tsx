@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import type { ProductionFormData } from "@/types/production";
 
 interface ProductionFormProps {
@@ -15,6 +16,7 @@ const tiposFarinha = ["BRANCA", "INTEGRAL", "ESPECIAL"];
 const peneiras = ["BICA", "FINA", "GROSSA"];
 
 export function ProductionForm({ onSubmit }: ProductionFormProps) {
+  const { toast } = useToast();
   const [formData, setFormData] = useState<ProductionFormData>({
     data: new Date().toISOString().split('T')[0],
     hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
@@ -27,7 +29,35 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    
+    // Validate forno - must be a number
+    const fornoNum = parseInt(formData.forno, 10);
+    if (isNaN(fornoNum) || fornoNum <= 0) {
+      toast({
+        title: "Campo inválido",
+        description: "O número do forno deve ser um valor numérico válido.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate umidade - must be a valid number
+    const umidadeNum = parseFloat(formData.umidade.replace(",", "."));
+    if (isNaN(umidadeNum) || umidadeNum < 0 || umidadeNum > 100) {
+      toast({
+        title: "Campo inválido",
+        description: "A % de umidade deve ser um valor entre 0 e 100.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    onSubmit({
+      ...formData,
+      forno: fornoNum.toString(),
+      umidade: umidadeNum.toString(),
+    });
+    
     setFormData({
       ...formData,
       forno: "",
@@ -75,11 +105,12 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="forno" className="text-sm font-medium">Forno</Label>
+            <Label htmlFor="forno" className="text-sm font-medium">Nº Forno *</Label>
             <Input
               id="forno"
-              type="text"
-              placeholder="Ex: 01, 02"
+              type="number"
+              min="1"
+              placeholder="Ex: 1, 2, 3"
               value={formData.forno}
               onChange={(e) => handleChange("forno", e.target.value)}
               required
@@ -88,11 +119,14 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="umidade" className="text-sm font-medium">% Umidade</Label>
+            <Label htmlFor="umidade" className="text-sm font-medium">% Umidade *</Label>
             <Input
               id="umidade"
-              type="text"
-              placeholder="Ex: 9.27%"
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              placeholder="Ex: 9.27"
               value={formData.umidade}
               onChange={(e) => handleChange("umidade", e.target.value)}
               required
