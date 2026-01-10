@@ -58,7 +58,7 @@ export function ProductionTable({ records, onDelete }: ProductionTableProps) {
                     <TableCell className="font-medium">{formatDate(record.data)}</TableCell>
                     <TableCell>{record.hora}</TableCell>
                     <TableCell>{record.forno}</TableCell>
-                    <TableCell className="font-medium text-primary">{record.umidade}</TableCell>
+                    <TableCell className="font-medium text-primary">{record.umidade}%</TableCell>
                     <TableCell>
                       <span className="px-2 py-1 bg-secondary/20 text-secondary-foreground rounded-md text-sm">
                         {record.tipoFarinha}

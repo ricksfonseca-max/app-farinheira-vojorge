@@ -1,60 +1,122 @@
 import { useState, useEffect } from "react";
-import type { ProductionRecord, ProductionFormData } from "@/types/production";
+import { supabase } from "@/integrations/supabase/client";
+import type { ProductionFormData, ProductionRecord } from "@/types/production";
 import { useToast } from "@/hooks/use-toast";
-
-const STORAGE_KEY = "production_records";
-
+import { useAuth } from "@/hooks/useAuth";
 export function useProductionRecords() {
   const [records, setRecords] = useState<ProductionRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { user } = useAuth();
+
+  const fetchRecords = async () => {
+    if (!user) {
+      setRecords([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("production_records")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      const mapped = (data || []).map((r) => ({
+        id: r.id,
+        data: r.data,
+        hora: r.hora,
+        forno: r.forno,
+        umidade: Number(r.umidade),
+        tipoFarinha: r.tipo_farinha,
+        peneira: r.peneira,
+        responsavel: r.responsavel,
+        createdAt: r.created_at,
+      }));
+
+      setRecords(mapped);
+    } catch (error) {
+      console.error("Error fetching records:", error);
+      toast({
+        title: "Erro ao carregar registros",
+        description: "Não foi possível carregar os registros.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setRecords(parsed);
-      } catch (error) {
-        console.error("Error loading records:", error);
-      }
+    fetchRecords();
+  }, [user]);
+
+  const addRecord = async (formData: ProductionFormData) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase.from("production_records").insert({
+        user_id: user.id,
+        data: formData.data,
+        hora: formData.hora,
+        forno: formData.forno,
+        umidade: parseFloat(formData.umidade),
+        tipo_farinha: formData.tipoFarinha,
+        peneira: formData.peneira,
+        responsavel: formData.responsavel,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Registro adicionado",
+        description: `Registro do forno ${formData.forno} salvo com sucesso.`,
+      });
+
+      fetchRecords();
+    } catch (error) {
+      console.error("Error adding record:", error);
+      toast({
+        title: "Erro ao salvar",
+        description: "Não foi possível salvar o registro.",
+        variant: "destructive",
+      });
     }
-  }, []);
-
-  const saveToStorage = (newRecords: ProductionRecord[]) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newRecords));
   };
 
-  const addRecord = (data: ProductionFormData) => {
-    const newRecord: ProductionRecord = {
-      ...data,
-      id: crypto.randomUUID(),
-      createdAt: new Date(),
-    };
+  const deleteRecord = async (id: string) => {
+    if (!user) return;
 
-    const newRecords = [newRecord, ...records];
-    setRecords(newRecords);
-    saveToStorage(newRecords);
+    try {
+      const { error } = await supabase
+        .from("production_records")
+        .delete()
+        .eq("id", id);
 
-    toast({
-      title: "Registro adicionado",
-      description: `Registro do forno ${data.forno} salvo com sucesso.`,
-    });
-  };
+      if (error) throw error;
 
-  const deleteRecord = (id: string) => {
-    const newRecords = records.filter(record => record.id !== id);
-    setRecords(newRecords);
-    saveToStorage(newRecords);
+      toast({
+        title: "Registro removido",
+        description: "O registro foi removido com sucesso.",
+        variant: "destructive",
+      });
 
-    toast({
-      title: "Registro removido",
-      description: "O registro foi removido com sucesso.",
-      variant: "destructive",
-    });
+      fetchRecords();
+    } catch (error) {
+      console.error("Error deleting record:", error);
+      toast({
+        title: "Erro ao remover",
+        description: "Não foi possível remover o registro.",
+        variant: "destructive",
+      });
+    }
   };
 
   return {
     records,
+    loading,
     addRecord,
     deleteRecord,
   };
