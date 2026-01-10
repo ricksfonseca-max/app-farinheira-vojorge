@@ -14,7 +14,72 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      production_records: {
+        Row: {
+          created_at: string
+          data: string
+          forno: string
+          hora: string
+          id: string
+          peneira: string
+          responsavel: string
+          tipo_farinha: string
+          umidade: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data: string
+          forno: string
+          hora: string
+          id?: string
+          peneira: string
+          responsavel: string
+          tipo_farinha: string
+          umidade: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: string
+          forno?: string
+          hora?: string
+          id?: string
+          peneira?: string
+          responsavel?: string
+          tipo_farinha?: string
+          umidade?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          id: string
+          lgpd_consent_at: string | null
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lgpd_consent_at?: string | null
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lgpd_consent_at?: string | null
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
