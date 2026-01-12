@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { Loader2 } from "lucide-react";
+import { Loader2, Factory } from "lucide-react"; // Adicionado ícone de Fábrica
 
 export function AuthForm() {
   const [isLogin, setIsLogin] = useState(true);
@@ -30,15 +30,6 @@ export function AuthForm() {
       return;
     }
 
-    if (!isLogin && name.trim().length < 2) {
-      toast({
-        title: "Nome inválido",
-        description: "Por favor, insira seu nome completo.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsLoading(true);
 
     try {
@@ -47,9 +38,7 @@ export function AuthForm() {
         if (error) {
           toast({
             title: "Erro no login",
-            description: error.message === "Invalid login credentials" 
-              ? "Email ou senha incorretos" 
-              : error.message,
+            description: error.message,
             variant: "destructive",
           });
         }
@@ -61,11 +50,6 @@ export function AuthForm() {
             description: error.message,
             variant: "destructive",
           });
-        } else {
-          toast({
-            title: "Cadastro realizado!",
-            description: "Bem-vindo ao sistema!",
-          });
         }
       }
     } finally {
@@ -74,30 +58,31 @@ export function AuthForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md border-primary/20">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+      <Card className="w-full max-w-md border-t-8 border-t-green-600 shadow-2xl">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 w-16 h-16 bg-primary rounded-full flex items-center justify-center">
-            <span className="text-primary-foreground text-2xl font-bold">VJ</span>
+          {/* Círculo com ícone de Fábrica em vez de apenas letras */}
+          <div className="mx-auto mb-4 w-16 h-16 bg-green-600 rounded-2xl flex items-center justify-center shadow-lg shadow-green-200">
+            <Factory className="text-white w-10 h-10" />
           </div>
-          <CardTitle className="text-2xl text-primary">Farinheira Vô Jorge</CardTitle>
-          <CardDescription>
-            {isLogin ? "Entre na sua conta" : "Crie sua conta"}
+          <CardTitle className="text-3xl font-black text-slate-800 uppercase tracking-tighter">Vô Jorge</CardTitle>
+          <CardDescription className="font-medium text-slate-500">
+            {isLogin ? "Acesso ao Sistema de Produção" : "Crie sua conta de operador"}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div className="space-y-2">
-                <Label htmlFor="name">Nome</Label>
+                <Label htmlFor="name">Nome Completo</Label>
                 <Input
                   id="name"
                   type="text"
-                  placeholder="Seu nome completo"
+                  placeholder="Seu nome"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required={!isLogin}
-                  maxLength={100}
+                  className="rounded-xl border-slate-200"
                 />
               </div>
             )}
@@ -111,7 +96,7 @@ export function AuthForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                maxLength={255}
+                className="rounded-xl border-slate-200"
               />
             </div>
             
@@ -124,7 +109,7 @@ export function AuthForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={6}
+                className="rounded-xl border-slate-200"
               />
             </div>
 
@@ -135,46 +120,28 @@ export function AuthForm() {
                   checked={lgpdConsent}
                   onCheckedChange={(checked) => setLgpdConsent(checked === true)}
                 />
-                <Label htmlFor="lgpd" className="text-sm text-muted-foreground leading-relaxed">
-                  Li e concordo com os{" "}
-                  <button 
-                    type="button"
-                    className="text-primary underline hover:text-primary/80"
-                    onClick={() => alert("Termos de Uso:\n\n1. Os dados coletados serão utilizados apenas para o funcionamento do sistema de controle de produção.\n\n2. Seus dados pessoais (nome e email) são armazenados de forma segura.\n\n3. Você pode solicitar a exclusão dos seus dados a qualquer momento.")}
-                  >
-                    Termos de Uso
-                  </button>{" "}
-                  e a{" "}
-                  <button 
-                    type="button"
-                    className="text-primary underline hover:text-primary/80"
-                    onClick={() => alert("Política de Privacidade (LGPD):\n\n• Dados coletados: nome, email e registros de produção.\n\n• Finalidade: Controle interno de produção da Farinheira Vô Jorge.\n\n• Armazenamento: Dados são armazenados de forma segura em servidores protegidos.\n\n• Seus direitos: Acesso, correção e exclusão dos dados pessoais.")}
-                  >
-                    Política de Privacidade
-                  </button>
+                <Label htmlFor="lgpd" className="text-xs text-muted-foreground leading-relaxed">
+                  Li e concordo com a Política de Privacidade (LGPD) da fábrica.
                 </Label>
               </div>
             )}
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isLogin ? "Entrar" : "Cadastrar"}
+            <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 py-6 text-lg font-bold rounded-xl transition-all active:scale-95 shadow-lg shadow-green-100" disabled={isLoading}>
+              {isLoading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+              {isLogin ? "ENTRAR" : "CADASTRAR"}
             </Button>
           </form>
 
-          <div className="mt-4 text-center text-sm">
-            <span className="text-muted-foreground">
-              {isLogin ? "Não tem conta? " : "Já tem conta? "}
-            </span>
+          <div className="mt-6 text-center text-sm">
             <button
               type="button"
-              className="text-primary underline hover:text-primary/80"
+              className="text-green-600 font-bold hover:underline"
               onClick={() => {
                 setIsLogin(!isLogin);
                 setLgpdConsent(false);
               }}
             >
-              {isLogin ? "Cadastre-se" : "Entrar"}
+              {isLogin ? "Não tem conta? Cadastre-se" : "Já tem conta? Entre aqui"}
             </button>
           </div>
         </CardContent>
