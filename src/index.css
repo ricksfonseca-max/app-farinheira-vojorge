@@ -34,6 +34,7 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-inter;
+    @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif; /* Corrigido: usando CSS padrão em vez de @apply */
   }
 }
