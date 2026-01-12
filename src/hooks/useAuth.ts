@@ -5,50 +5,37 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Tenta recuperar da SESSÃO (apaga ao fechar a aba/navegador)
-    try {
-      const savedUser = sessionStorage.getItem("farinheira_user");
-      if (savedUser) {
-        setUser(JSON.parse(savedUser));
+    const checkAuth = () => {
+      try {
+        const savedUser = sessionStorage.getItem("farinheira_user");
+        if (savedUser) {
+          setUser(JSON.parse(savedUser));
+        }
+      } catch (e) {
+        console.error("Erro na sessão", e);
+      } finally {
+        setLoading(false);
       }
-    } catch (e) {
-      console.error("Erro ao carregar sessão", e);
-    }
-    setLoading(false);
+    };
+    checkAuth();
   }, []);
 
   const signIn = async (email: string, pass: string) => {
-    // Validação da senha da fábrica
     if (pass === "jorge123") {
-      const userData = { 
-        id: "1", 
-        email: email.toLowerCase(), 
-        name: email.split('@')[0] 
-      };
-      
-      // Salva na sessão
+      const userData = { id: "1", email, name: email.split('@')[0] };
       sessionStorage.setItem("farinheira_user", JSON.stringify(userData));
-      
-      // FORÇA O RECARREGAMENTO: Isso resolve o problema de "não ir a lugar algum"
-      window.location.reload();
-      
+      setUser(userData);
+      // O reload garante que o Index.tsx perceba a mudança
+      window.location.href = "/"; 
       return { error: null };
     }
-    
-    return { error: { message: "Senha incorreta. Use jorge123" } };
+    return { error: { message: "Senha incorreta (use jorge123)" } };
   };
 
-  const signUp = async (email: string, pass: string, name: string) => {
-    const userData = { id: Math.random().toString(), email, name };
-    sessionStorage.setItem("farinheira_user", JSON.stringify(userData));
-    window.location.reload();
-    return { error: null };
-  };
-
-  const signOut = async () => {
+  const signOut = () => {
     sessionStorage.removeItem("farinheira_user");
-    window.location.reload(); // Volta para o login imediatamente
+    window.location.href = "/";
   };
 
-  return { user, loading, signIn, signUp, signOut };
+  return { user, loading, signIn, signOut };
 }
