@@ -1,13 +1,18 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import type { ProductionFormData, ProductionRecord } from "@/types/production";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+
 export function useProductionRecords() {
   const [records, setRecords] = useState<ProductionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { user } = useAuth();
+
+  // URL Inteligente: Detecta se está local ou na VPS
+  const API_URL = window.location.origin.includes("localhost")
+    ? "http://localhost:1880/api/producao"
+    : "/api/producao"; // No Easypanel, o Proxy cuidará do redirecionamento
 
   const fetchRecords = async () => {
     if (!user) {
@@ -17,31 +22,16 @@ export function useProductionRecords() {
     }
 
     try {
-      const { data, error } = await supabase
-        .from("production_records")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-
-      const mapped = (data || []).map((r) => ({
-        id: r.id,
-        data: r.data,
-        hora: r.hora,
-        forno: r.forno,
-        umidade: Number(r.umidade),
-        tipoFarinha: r.tipo_farinha,
-        peneira: r.peneira,
-        responsavel: r.responsavel,
-        createdAt: r.created_at,
-      }));
-
-      setRecords(mapped);
+      const response = await fetch(API_URL);
+      if (!response.ok) throw new Error("Falha ao buscar dados no MySQL");
+      
+      const data = await response.json();
+      setRecords(data);
     } catch (error) {
       console.error("Error fetching records:", error);
       toast({
-        title: "Erro ao carregar registros",
-        description: "Não foi possível carregar os registros.",
+        title: "Erro no MySQL",
+        description: "Não foi possível carregar os dados da farinheira.",
         variant: "destructive",
       });
     } finally {
@@ -57,67 +47,53 @@ export function useProductionRecords() {
     if (!user) return;
 
     try {
-      const { error } = await supabase.from("production_records").insert({
-        user_id: user.id,
-        data: formData.data,
-        hora: formData.hora,
-        forno: formData.forno,
-        umidade: parseFloat(formData.umidade),
-        tipo_farinha: formData.tipoFarinha,
-        peneira: formData.peneira,
-        responsavel: formData.responsavel,
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...formData,
+          usuario_id: user.id, // Vincula o registro ao operador
+          unidade: "Indústria Vô Jorge"
+        }),
       });
 
-      if (error) throw error;
+      if (!response.ok) throw new Error("Erro ao salvar no MySQL");
 
       toast({
-        title: "Registro adicionado",
-        description: `Registro do forno ${formData.forno} salvo com sucesso.`,
+        title: "Sucesso!",
+        description: `Produção do forno ${formData.forno} registrada.`,
       });
 
-      fetchRecords();
+      fetchRecords(); // Atualiza a tabela
     } catch (error) {
-      console.error("Error adding record:", error);
       toast({
         title: "Erro ao salvar",
-        description: "Não foi possível salvar o registro.",
+        description: "Verifique a conexão com o banco de dados da fábrica.",
         variant: "destructive",
       });
     }
   };
 
   const deleteRecord = async (id: string) => {
-    if (!user) return;
-
     try {
-      const { error } = await supabase
-        .from("production_records")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
+      const response = await fetch(`${API_URL}/${id}`, { method: "DELETE" });
+      if (!response.ok) throw new Error("Erro ao deletar");
 
       toast({
-        title: "Registro removido",
-        description: "O registro foi removido com sucesso.",
+        title: "Removido",
+        description: "Registro excluído do MySQL.",
         variant: "destructive",
       });
 
       fetchRecords();
     } catch (error) {
-      console.error("Error deleting record:", error);
       toast({
-        title: "Erro ao remover",
+        title: "Erro",
         description: "Não foi possível remover o registro.",
         variant: "destructive",
       });
     }
   };
 
-  return {
-    records,
-    loading,
-    addRecord,
-    deleteRecord,
-  };
+  return { records, loading, addRecord, deleteRecord };
 }
