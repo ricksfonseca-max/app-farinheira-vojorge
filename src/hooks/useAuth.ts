@@ -5,38 +5,46 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // MUDANÇA: Agora usamos sessionStorage (apaga ao fechar a aba)
-    const savedUser = sessionStorage.getItem("farinheira_user");
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
+    // Tenta recuperar do localStorage (que é permanente)
+    try {
+      const savedUser = localStorage.getItem("farinheira_user");
+      if (savedUser) {
+        setUser(JSON.parse(savedUser));
+      }
+    } catch (e) {
+      console.error("Erro ao carregar usuário salvo", e);
     }
     setLoading(false);
   }, []);
 
   const signIn = async (email: string, pass: string) => {
-    // Login para a fábrica: jorge / jorge123
+    // IMPORTANTE: A senha definida no código é jorge123
     if (pass === "jorge123") {
-      const userData = { id: "1", email, name: email.split('@')[0] };
+      const userData = { 
+        id: "1", 
+        email: email.toLowerCase(), 
+        name: email.split('@')[0] 
+      };
+      
       setUser(userData);
-      // MUDANÇA: Salva na sessão
-      sessionStorage.setItem("farinheira_user", JSON.stringify(userData));
+      // Salva no localStorage para não pedir login ao voltar
+      localStorage.setItem("farinheira_user", JSON.stringify(userData));
       return { error: null };
     }
-    return { error: { message: "Senha incorreta para a fábrica." } };
+    
+    return { error: { message: "Senha incorreta. Use a senha padrão da fábrica." } };
   };
 
   const signUp = async (email: string, pass: string, name: string) => {
     const userData = { id: Math.random().toString(), email, name };
     setUser(userData);
-    // MUDANÇA: Salva na sessão
-    sessionStorage.setItem("farinheira_user", JSON.stringify(userData));
+    localStorage.setItem("farinheira_user", JSON.stringify(userData));
     return { error: null };
   };
 
   const signOut = async () => {
     setUser(null);
-    // MUDANÇA: Limpa a sessão
-    sessionStorage.removeItem("farinheira_user");
+    localStorage.removeItem("farinheira_user");
   };
 
   return { user, loading, signIn, signUp, signOut };
