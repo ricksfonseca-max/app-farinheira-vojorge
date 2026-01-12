@@ -2,35 +2,20 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Loader2, ClipboardCheck } from "lucide-react";
+import { Plus, Loader2, ClipboardList } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { ProductionFormData } from "@/types/production";
-
-interface ProductionFormProps {
-  onSubmit: (data: ProductionFormData) => void;
-}
 
 const tiposFarinha = ["BRANCA", "INTEGRAL", "ESPECIAL"];
 const peneiras = ["BICA", "FINA", "GROSSA"];
 
-export function ProductionForm({ onSubmit }: ProductionFormProps) {
+export function ProductionForm({ onSubmit }: { onSubmit: (data: any) => void }) {
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const [formData, setFormData] = useState<ProductionFormData>({
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
     data: new Date().toISOString().split("T")[0],
-    hora: new Date().toLocaleTimeString("pt-BR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
+    hora: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
     forno: "",
     umidade: "",
     tipoFarinha: "BRANCA",
@@ -40,203 +25,68 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
 
-    // --- VALIDAÇÕES ---
-    const fornoNum = parseInt(formData.forno, 10);
-    if (isNaN(fornoNum) || fornoNum <= 0) {
-      toast({
-        title: "Erro no Forno",
-        description: "Por favor, insira um número de forno válido.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Tratamento da Vírgula -> Ponto para Umidade
-    const umidadeNum = parseFloat(formData.umidade.replace(",", "."));
-    if (isNaN(umidadeNum) || umidadeNum < 0 || umidadeNum > 100) {
-      toast({
-        title: "Erro na Umidade",
-        description: "A umidade deve estar entre 0 e 100%.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
+    // Tratamento de dados para o MySQL
+    const payload = {
+      ...formData,
+      forno: parseInt(formData.forno),
+      umidade: parseFloat(formData.umidade.replace(",", ".")),
+    };
 
     try {
-      // --- LÓGICA DE URL INTELIGENTE ---
-      const domain = window.location.origin;
-      const baseUrl = domain.includes("localhost")
-        ? "http://localhost:1880" 
-        : "https://app-farinheira.fsk.tec.br"; // Sua URL da VPS
-
-      const API_URL = `${baseUrl}/api/registrar-producao`;
-
-      const response = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          umidade: umidadeNum,
-          forno: formData.forno,
-          origem: "App Indústria Vô Jorge"
-        }),
-      });
-
-      if (!response.ok) throw new Error("Erro no servidor");
-
-      toast({
-        title: "Sucesso!",
-        description: "Dados salvos no sistema da fábrica.",
-      });
-
-      // Notifica o componente pai e limpa os campos variáveis
-      onSubmit({ ...formData, umidade: umidadeNum.toString() });
-      setFormData({
-        ...formData,
-        forno: "",
-        umidade: "",
-        hora: new Date().toLocaleTimeString("pt-BR", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      });
+      await onSubmit(payload);
+      setFormData({ ...formData, forno: "", umidade: "" });
+      toast({ title: "Sucesso", description: "Dados registrados na Farinheira." });
     } catch (error) {
-      console.error(error);
-      toast({
-        title: "Erro de Conexão",
-        description: "O banco de dados ou Node-RED parece estar offline.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Falha ao salvar no banco.", variant: "destructive" });
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
-  };
-
-  const handleChange = (field: keyof ProductionFormData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   return (
-    <Card className="animate-fade-in shadow-xl border-t-4 border-t-green-600">
-      <CardHeader className="bg-slate-50 rounded-t-lg">
-        <CardTitle className="flex items-center gap-2 text-xl font-bold text-slate-800">
-          <ClipboardCheck className="w-6 h-6 text-green-600" /> 
-          Indústria Vô Jorge - Registro
+    <Card className="border-l-8 border-l-green-600 shadow-lg">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-slate-700">
+          <ClipboardList className="text-green-600" /> Novo Registro de Produção
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-6">
-        <form onSubmit={handleSubmit} className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div className="space-y-2">
-            <Label htmlFor="data" className="font-bold text-slate-600">Data</Label>
-            <Input
-              id="data"
-              type="date"
-              value={formData.data}
-              onChange={(e) => handleChange("data", e.target.value)}
-              required
-              disabled={isSubmitting}
-              className="rounded-lg border-slate-200 focus:ring-green-500"
-            />
+      <CardContent>
+        <form onSubmit={handleSubmit} className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="space-y-1">
+            <Label>Data</Label>
+            <Input type="date" value={formData.data} onChange={(e) => setFormData({...formData, data: e.target.value})} required />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="hora" className="font-bold text-slate-600">Hora</Label>
-            <Input
-              id="hora"
-              type="time"
-              value={formData.hora}
-              onChange={(e) => handleChange("hora", e.target.value)}
-              required
-              disabled={isSubmitting}
-              className="rounded-lg border-slate-200 focus:ring-green-500"
-            />
+          <div className="space-y-1">
+            <Label>Forno</Label>
+            <Input type="number" placeholder="Ex: 1" value={formData.forno} onChange={(e) => setFormData({...formData, forno: e.target.value})} required />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="forno" className="font-bold text-slate-600">Forno</Label>
-            <Input
-              id="forno"
-              type="number"
-              value={formData.forno}
-              onChange={(e) => handleChange("forno", e.target.value)}
-              required
-              disabled={isSubmitting}
-              placeholder="Nº Forno"
-              className="rounded-lg border-slate-200 focus:ring-green-500"
-            />
+          <div className="space-y-1">
+            <Label>Umidade %</Label>
+            <Input placeholder="Ex: 12,5" value={formData.umidade} onChange={(e) => setFormData({...formData, umidade: e.target.value})} required />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="umidade" className="font-bold text-slate-600">Umidade (%)</Label>
-            <Input
-              id="umidade"
-              inputMode="decimal"
-              value={formData.umidade}
-              onChange={(e) => handleChange("umidade", e.target.value)}
-              required
-              disabled={isSubmitting}
-              placeholder="Ex: 13,5"
-              className="rounded-lg border-slate-200 focus:ring-green-500"
-            />
+          <div className="space-y-1">
+            <Label>Responsável</Label>
+            <Input placeholder="Nome" value={formData.responsavel} onChange={(e) => setFormData({...formData, responsavel: e.target.value})} required />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="tipoFarinha" className="font-bold text-slate-600">Tipo Farinha</Label>
-            <Select
-              value={formData.tipoFarinha}
-              onValueChange={(v) => handleChange("tipoFarinha", v)}
-              disabled={isSubmitting}
-            >
-              <SelectTrigger className="rounded-lg border-slate-200">
-                <SelectValue placeholder="Selecione" />
-              </SelectTrigger>
-              <SelectContent>
-                {tiposFarinha.map((t) => (
-                  <SelectItem key={t} value={t}>{t}</SelectItem>
-                ))}
-              </SelectContent>
+          <div className="space-y-1">
+            <Label>Tipo</Label>
+            <Select value={formData.tipoFarinha} onValueChange={(v) => setFormData({...formData, tipoFarinha: v})}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{tiposFarinha.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="peneira" className="font-bold text-slate-600">Peneira</Label>
-            <Select
-              value={formData.peneira}
-              onValueChange={(v) => handleChange("peneira", v)}
-              disabled={isSubmitting}
-            >
-              <SelectTrigger className="rounded-lg border-slate-200">
-                <SelectValue placeholder="Selecione" />
-              </SelectTrigger>
-              <SelectContent>
-                {peneiras.map((p) => (
-                  <SelectItem key={p} value={p}>{p}</SelectItem>
-                ))}
-              </SelectContent>
+          <div className="space-y-1">
+            <Label>Peneira</Label>
+            <Select value={formData.peneira} onValueChange={(v) => setFormData({...formData, peneira: v})}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{peneiras.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <div className="space-y-2 col-span-2 md:col-span-1">
-            <Label htmlFor="responsavel" className="font-bold text-slate-600">Responsável</Label>
-            <Input
-              id="responsavel"
-              value={formData.responsavel}
-              onChange={(e) => handleChange("responsavel", e.target.value)}
-              required
-              disabled={isSubmitting}
-              placeholder="Nome do operador"
-              className="rounded-lg border-slate-200 focus:ring-green-500"
-            />
-          </div>
-          <div className="col-span-2 md:col-span-1 flex items-end">
-            <Button 
-              type="submit" 
-              className="w-full bg-green-600 hover:bg-green-700 font-bold py-6 rounded-lg transition-all shadow-md active:scale-95" 
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              ) : (
-                <Plus className="w-5 h-5 mr-2" />
-              )}{" "}
-              SALVAR REGISTRO
+          <div className="col-span-2 flex items-end">
+            <Button type="submit" className="w-full bg-green-600 hover:bg-green-700" disabled={loading}>
+              {loading ? <Loader2 className="animate-spin" /> : <Plus className="mr-2" />} Salvar Registro
             </Button>
           </div>
         </form>
