@@ -1,57 +1,43 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import type { User } from "@supabase/supabase-js";
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setUser(session?.user ?? null);
-        setLoading(false);
-      }
-    );
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    // MUDANÇA: Agora usamos sessionStorage (apaga ao fechar a aba)
+    const savedUser = sessionStorage.getItem("farinheira_user");
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
+    }
+    setLoading(false);
   }, []);
 
-  const signUp = async (email: string, password: string, name: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: window.location.origin,
-        data: { name }
-      }
-    });
-    return { error };
+  const signIn = async (email: string, pass: string) => {
+    // Login para a fábrica: jorge / jorge123
+    if (pass === "jorge123") {
+      const userData = { id: "1", email, name: email.split('@')[0] };
+      setUser(userData);
+      // MUDANÇA: Salva na sessão
+      sessionStorage.setItem("farinheira_user", JSON.stringify(userData));
+      return { error: null };
+    }
+    return { error: { message: "Senha incorreta para a fábrica." } };
   };
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-    return { error };
+  const signUp = async (email: string, pass: string, name: string) => {
+    const userData = { id: Math.random().toString(), email, name };
+    setUser(userData);
+    // MUDANÇA: Salva na sessão
+    sessionStorage.setItem("farinheira_user", JSON.stringify(userData));
+    return { error: null };
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    return { error };
+    setUser(null);
+    // MUDANÇA: Limpa a sessão
+    sessionStorage.removeItem("farinheira_user");
   };
 
-  return {
-    user,
-    loading,
-    signUp,
-    signIn,
-    signOut
-  };
+  return { user, loading, signIn, signUp, signOut };
 }
