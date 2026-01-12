@@ -1,82 +1,248 @@
-import React from "react";
-import { useForm } from "react-hook-form";
-import { toast } from "sonner";
-import { ClipboardList, Save, Package } from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Plus, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import type { ProductionFormData } from "@/types/production";
 
-export function ProductionForm() {
-  const { register, handleSubmit, reset } = useForm();
+interface ProductionFormProps {
+  onSubmit: (data: ProductionFormData) => void;
+}
 
-  const onSubmit = async (data: any) => {
-    // Log para verificar os dados antes de enviar ao MySQL (sql-industria)
-    console.log("Dados da Produção Vô Jorge:", data);
-    
-    // Simulação de salvamento
-    toast.success("Registro enviado para o sistema da fábrica!");
-    reset();
+const tiposFarinha = ["BRANCA", "INTEGRAL", "ESPECIAL"];
+const peneiras = ["BICA", "FINA", "GROSSA"];
+
+export function ProductionForm({ onSubmit }: ProductionFormProps) {
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [formData, setFormData] = useState<ProductionFormData>({
+    data: new Date().toISOString().split("T")[0],
+    hora: new Date().toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+    forno: "",
+    umidade: "",
+    tipoFarinha: "BRANCA",
+    peneira: "BICA",
+    responsavel: "",
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // --- VALIDAÇÕES ---
+    const fornoNum = parseInt(formData.forno, 10);
+    if (isNaN(fornoNum) || fornoNum <= 0) {
+      toast({
+        title: "Erro",
+        description: "Forno inválido.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Tratamento da Vírgula -> Ponto
+    const umidadeNum = parseFloat(formData.umidade.replace(",", "."));
+    if (isNaN(umidadeNum) || umidadeNum < 0 || umidadeNum > 100) {
+      toast({
+        title: "Erro",
+        description: "Umidade inválida (0-100).",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // --- LÓGICA DE URL INTELIGENTE ---
+      // Pega o domínio atual onde o site está rodando
+      const domain = window.location.origin;
+
+      // Se estiver rodando local (localhost), aponta para a API na porta 1880 (Node-RED)
+      // Se estiver em produção (https://fsk.tec.com.br), usa a mesma base
+      const baseUrl = domain.includes("localhost")
+        ? "http://localhost:1880" // Ajuste se seu Node-RED local usar outra porta ou IP
+        : "https://fsk.tec.com.br"; // URL da VPS
+
+      const API_URL = `${baseUrl}/api/registrar-producao`;
+
+      console.log("Enviando para:", API_URL);
+
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...formData,
+          umidade: umidadeNum,
+          forno: formData.forno,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Erro no servidor");
+
+      toast({
+        title: "Sucesso!",
+        description: "Dados salvos na fábrica.",
+        variant: "default",
+      });
+
+      // Limpa e Atualiza
+      onSubmit({ ...formData, umidade: umidadeNum.toString() });
+      setFormData({
+        ...formData,
+        forno: "",
+        umidade: "",
+        hora: new Date().toLocaleTimeString("pt-BR", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      });
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "Erro de Conexão",
+        description: "Verifique se a VPS/Node-RED está rodando.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleChange = (field: keyof ProductionFormData, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   return (
-    <div className="max-w-lg mx-auto p-8 bg-white rounded-2xl shadow-xl border border-blue-100 mt-8">
-      <div className="flex items-center gap-3 mb-8 border-b pb-4">
-        <div className="p-2 bg-blue-600 rounded-lg text-white">
-          <ClipboardList size={28} />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800">Indústria Vô Jorge</h2>
-          <p className="text-sm text-slate-500">Registro de Produção - Farinheira</p>
-        </div>
-      </div>
-
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid grid-cols-1 gap-6">
-          {/* Campo Operador */}
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">Operador Responsável</label>
-            <input 
-              {...register("operador")} 
-              placeholder="Digite seu nome"
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none" 
-              required 
+    <Card className="animate-fade-in shadow-lg border-0">
+      <CardHeader className="bg-primary text-primary-foreground rounded-t-lg">
+        <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+          <Plus className="w-5 h-5" /> Novo Registro
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-6">
+        <form
+          onSubmit={handleSubmit}
+          className="grid grid-cols-2 md:grid-cols-4 gap-4"
+        >
+          <div className="space-y-2">
+            <Label htmlFor="data">Data</Label>
+            <Input
+              id="data"
+              type="date"
+              value={formData.data}
+              onChange={(e) => handleChange("data", e.target.value)}
+              required
+              disabled={isSubmitting}
             />
           </div>
-
-          {/* Campo Produto */}
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">Produto</label>
-            <select 
-              {...register("produto")}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+          <div className="space-y-2">
+            <Label htmlFor="hora">Hora</Label>
+            <Input
+              id="hora"
+              type="time"
+              value={formData.hora}
+              onChange={(e) => handleChange("hora", e.target.value)}
+              required
+              disabled={isSubmitting}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="forno">Forno</Label>
+            <Input
+              id="forno"
+              type="number"
+              value={formData.forno}
+              onChange={(e) => handleChange("forno", e.target.value)}
+              required
+              disabled={isSubmitting}
+              placeholder="Ex: 1"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="umidade">Umidade %</Label>
+            <Input
+              id="umidade"
+              inputMode="decimal"
+              value={formData.umidade}
+              onChange={(e) => handleChange("umidade", e.target.value)}
+              required
+              disabled={isSubmitting}
+              placeholder="Ex: 12.5"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="tipoFarinha">Tipo</Label>
+            <Select
+              value={formData.tipoFarinha}
+              onValueChange={(v) => handleChange("tipoFarinha", v)}
+              disabled={isSubmitting}
             >
-              <option value="farinha-mandioca">Farinha de Mandioca</option>
-              <option value="polvilho-doce">Polvilho Doce</option>
-              <option value="polvilho-azedo">Polvilho Azedo</option>
-            </select>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione" />
+              </SelectTrigger>
+              <SelectContent>
+                {tiposFarinha.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-
-          {/* Campo Quantidade */}
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">Quantidade (Sacos)</label>
-            <div className="relative">
-              <input 
-                type="number" 
-                {...register("quantidade")} 
-                placeholder="0"
-                className="w-full p-3 pl-10 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all outline-none" 
-                required 
-              />
-              <Package className="absolute left-3 top-3.5 text-slate-400" size={18} />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="peneira">Peneira</Label>
+            <Select
+              value={formData.peneira}
+              onValueChange={(v) => handleChange("peneira", v)}
+              disabled={isSubmitting}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione" />
+              </SelectTrigger>
+              <SelectContent>
+                {peneiras.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {p}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        </div>
-
-        <button 
-          type="submit" 
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-3 shadow-lg shadow-blue-200 transition-all active:scale-95"
-        >
-          <Save size={22} />
-          Salvar no MySQL
-        </button>
-      </form>
-    </div>
+          <div className="space-y-2 col-span-2 md:col-span-1">
+            <Label htmlFor="responsavel">Responsável</Label>
+            <Input
+              id="responsavel"
+              value={formData.responsavel}
+              onChange={(e) => handleChange("responsavel", e.target.value)}
+              required
+              disabled={isSubmitting}
+            />
+          </div>
+          <div className="col-span-2 md:col-span-1 flex items-end">
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Plus className="w-4 h-4 mr-2" />
+              )}{" "}
+              Salvar
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
