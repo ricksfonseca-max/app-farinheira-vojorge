@@ -5,20 +5,20 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Tenta recuperar do localStorage (que é permanente)
+    // Tenta recuperar da SESSÃO (apaga ao fechar a aba/navegador)
     try {
-      const savedUser = localStorage.getItem("farinheira_user");
+      const savedUser = sessionStorage.getItem("farinheira_user");
       if (savedUser) {
         setUser(JSON.parse(savedUser));
       }
     } catch (e) {
-      console.error("Erro ao carregar usuário salvo", e);
+      console.error("Erro ao carregar sessão", e);
     }
     setLoading(false);
   }, []);
 
   const signIn = async (email: string, pass: string) => {
-    // IMPORTANTE: A senha definida no código é jorge123
+    // Validação da senha da fábrica
     if (pass === "jorge123") {
       const userData = { 
         id: "1", 
@@ -26,25 +26,28 @@ export function useAuth() {
         name: email.split('@')[0] 
       };
       
-      setUser(userData);
-      // Salva no localStorage para não pedir login ao voltar
-      localStorage.setItem("farinheira_user", JSON.stringify(userData));
+      // Salva na sessão
+      sessionStorage.setItem("farinheira_user", JSON.stringify(userData));
+      
+      // FORÇA O RECARREGAMENTO: Isso resolve o problema de "não ir a lugar algum"
+      window.location.reload();
+      
       return { error: null };
     }
     
-    return { error: { message: "Senha incorreta. Use a senha padrão da fábrica." } };
+    return { error: { message: "Senha incorreta. Use jorge123" } };
   };
 
   const signUp = async (email: string, pass: string, name: string) => {
     const userData = { id: Math.random().toString(), email, name };
-    setUser(userData);
-    localStorage.setItem("farinheira_user", JSON.stringify(userData));
+    sessionStorage.setItem("farinheira_user", JSON.stringify(userData));
+    window.location.reload();
     return { error: null };
   };
 
   const signOut = async () => {
-    setUser(null);
-    localStorage.removeItem("farinheira_user");
+    sessionStorage.removeItem("farinheira_user");
+    window.location.reload(); // Volta para o login imediatamente
   };
 
   return { user, loading, signIn, signUp, signOut };
