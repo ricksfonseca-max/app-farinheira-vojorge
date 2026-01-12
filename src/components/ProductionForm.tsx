@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, ClipboardCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { ProductionFormData } from "@/types/production";
 
@@ -45,19 +45,19 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
     const fornoNum = parseInt(formData.forno, 10);
     if (isNaN(fornoNum) || fornoNum <= 0) {
       toast({
-        title: "Erro",
-        description: "Forno inválido.",
+        title: "Erro no Forno",
+        description: "Por favor, insira um número de forno válido.",
         variant: "destructive",
       });
       return;
     }
 
-    // Tratamento da Vírgula -> Ponto
+    // Tratamento da Vírgula -> Ponto para Umidade
     const umidadeNum = parseFloat(formData.umidade.replace(",", "."));
     if (isNaN(umidadeNum) || umidadeNum < 0 || umidadeNum > 100) {
       toast({
-        title: "Erro",
-        description: "Umidade inválida (0-100).",
+        title: "Erro na Umidade",
+        description: "A umidade deve estar entre 0 e 100%.",
         variant: "destructive",
       });
       return;
@@ -67,18 +67,12 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
 
     try {
       // --- LÓGICA DE URL INTELIGENTE ---
-      // Pega o domínio atual onde o site está rodando
       const domain = window.location.origin;
-
-      // Se estiver rodando local (localhost), aponta para a API na porta 1880 (Node-RED)
-      // Se estiver em produção (https://fsk.tec.com.br), usa a mesma base
       const baseUrl = domain.includes("localhost")
-        ? "http://localhost:1880" // Ajuste se seu Node-RED local usar outra porta ou IP
-        : "https://fsk.tec.com.br"; // URL da VPS
+        ? "http://localhost:1880" 
+        : "https://app-farinheira.fsk.tec.br"; // Sua URL da VPS
 
       const API_URL = `${baseUrl}/api/registrar-producao`;
-
-      console.log("Enviando para:", API_URL);
 
       const response = await fetch(API_URL, {
         method: "POST",
@@ -87,6 +81,7 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
           ...formData,
           umidade: umidadeNum,
           forno: formData.forno,
+          origem: "App Indústria Vô Jorge"
         }),
       });
 
@@ -94,11 +89,10 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
 
       toast({
         title: "Sucesso!",
-        description: "Dados salvos na fábrica.",
-        variant: "default",
+        description: "Dados salvos no sistema da fábrica.",
       });
 
-      // Limpa e Atualiza
+      // Notifica o componente pai e limpa os campos variáveis
       onSubmit({ ...formData, umidade: umidadeNum.toString() });
       setFormData({
         ...formData,
@@ -113,7 +107,7 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
       console.error(error);
       toast({
         title: "Erro de Conexão",
-        description: "Verifique se a VPS/Node-RED está rodando.",
+        description: "O banco de dados ou Node-RED parece estar offline.",
         variant: "destructive",
       });
     } finally {
@@ -126,19 +120,17 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
   };
 
   return (
-    <Card className="animate-fade-in shadow-lg border-0">
-      <CardHeader className="bg-primary text-primary-foreground rounded-t-lg">
-        <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-          <Plus className="w-5 h-5" /> Novo Registro
+    <Card className="animate-fade-in shadow-xl border-t-4 border-t-green-600">
+      <CardHeader className="bg-slate-50 rounded-t-lg">
+        <CardTitle className="flex items-center gap-2 text-xl font-bold text-slate-800">
+          <ClipboardCheck className="w-6 h-6 text-green-600" /> 
+          Indústria Vô Jorge - Registro
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-6">
-        <form
-          onSubmit={handleSubmit}
-          className="grid grid-cols-2 md:grid-cols-4 gap-4"
-        >
+        <form onSubmit={handleSubmit} className="grid grid-cols-2 md:grid-cols-4 gap-6">
           <div className="space-y-2">
-            <Label htmlFor="data">Data</Label>
+            <Label htmlFor="data" className="font-bold text-slate-600">Data</Label>
             <Input
               id="data"
               type="date"
@@ -146,10 +138,11 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
               onChange={(e) => handleChange("data", e.target.value)}
               required
               disabled={isSubmitting}
+              className="rounded-lg border-slate-200 focus:ring-green-500"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="hora">Hora</Label>
+            <Label htmlFor="hora" className="font-bold text-slate-600">Hora</Label>
             <Input
               id="hora"
               type="time"
@@ -157,10 +150,11 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
               onChange={(e) => handleChange("hora", e.target.value)}
               required
               disabled={isSubmitting}
+              className="rounded-lg border-slate-200 focus:ring-green-500"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="forno">Forno</Label>
+            <Label htmlFor="forno" className="font-bold text-slate-600">Forno</Label>
             <Input
               id="forno"
               type="number"
@@ -168,11 +162,12 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
               onChange={(e) => handleChange("forno", e.target.value)}
               required
               disabled={isSubmitting}
-              placeholder="Ex: 1"
+              placeholder="Nº Forno"
+              className="rounded-lg border-slate-200 focus:ring-green-500"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="umidade">Umidade %</Label>
+            <Label htmlFor="umidade" className="font-bold text-slate-600">Umidade (%)</Label>
             <Input
               id="umidade"
               inputMode="decimal"
@@ -180,65 +175,68 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
               onChange={(e) => handleChange("umidade", e.target.value)}
               required
               disabled={isSubmitting}
-              placeholder="Ex: 12.5"
+              placeholder="Ex: 13,5"
+              className="rounded-lg border-slate-200 focus:ring-green-500"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="tipoFarinha">Tipo</Label>
+            <Label htmlFor="tipoFarinha" className="font-bold text-slate-600">Tipo Farinha</Label>
             <Select
               value={formData.tipoFarinha}
               onValueChange={(v) => handleChange("tipoFarinha", v)}
               disabled={isSubmitting}
             >
-              <SelectTrigger>
+              <SelectTrigger className="rounded-lg border-slate-200">
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
               <SelectContent>
                 {tiposFarinha.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
-                  </SelectItem>
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="peneira">Peneira</Label>
+            <Label htmlFor="peneira" className="font-bold text-slate-600">Peneira</Label>
             <Select
               value={formData.peneira}
               onValueChange={(v) => handleChange("peneira", v)}
               disabled={isSubmitting}
             >
-              <SelectTrigger>
+              <SelectTrigger className="rounded-lg border-slate-200">
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
               <SelectContent>
                 {peneiras.map((p) => (
-                  <SelectItem key={p} value={p}>
-                    {p}
-                  </SelectItem>
+                  <SelectItem key={p} value={p}>{p}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2 col-span-2 md:col-span-1">
-            <Label htmlFor="responsavel">Responsável</Label>
+            <Label htmlFor="responsavel" className="font-bold text-slate-600">Responsável</Label>
             <Input
               id="responsavel"
               value={formData.responsavel}
               onChange={(e) => handleChange("responsavel", e.target.value)}
               required
               disabled={isSubmitting}
+              placeholder="Nome do operador"
+              className="rounded-lg border-slate-200 focus:ring-green-500"
             />
           </div>
           <div className="col-span-2 md:col-span-1 flex items-end">
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
+            <Button 
+              type="submit" 
+              className="w-full bg-green-600 hover:bg-green-700 font-bold py-6 rounded-lg transition-all shadow-md active:scale-95" 
+              disabled={isSubmitting}
+            >
               {isSubmitting ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
               ) : (
-                <Plus className="w-4 h-4 mr-2" />
+                <Plus className="w-5 h-5 mr-2" />
               )}{" "}
-              Salvar
+              SALVAR REGISTRO
             </Button>
           </div>
         </form>
