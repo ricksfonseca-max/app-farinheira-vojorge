@@ -17,7 +17,7 @@ export function Header({ user, onLogout }: HeaderProps) {
           </div>
           <div className="flex flex-col leading-none">
             <span className="font-black tracking-tighter text-lg uppercase">Indústria Vô Jorge</span>
-            <span className="text-[10px] uppercase tracking-widest text-green-200">Farinheira & Polvilho</span>
+            <span className="text-[10px] uppercase tracking-widest text-green-200">Farinheira</span>
           </div>
         </div>
 
