@@ -13,34 +13,31 @@ export function MoistureTrends({ records }: { records: any[] }) {
 
   // Processamento dos dados
   const chartData = useMemo(() => {
-    // 1. Cria uma cópia segura dos dados
     let filteredData = [...records];
 
-    // 2. Filtra por Forno
+    // Filtro por Forno
     if (selectedForno !== "all") {
       filteredData = filteredData.filter(r => r.forno.toString() === selectedForno);
     }
 
-    // 3. Filtra por Data Inicial
+    // Filtro por Data Inicial
     if (dateStart) {
       filteredData = filteredData.filter(r => r.data >= dateStart);
     }
 
-    // 4. Filtra por Data Final
+    // Filtro por Data Final
     if (dateEnd) {
       filteredData = filteredData.filter(r => r.data <= dateEnd);
     }
 
-    // 5. Ordena Cronologicamente (Antigo -> Novo) para o gráfico desenhar da esquerda para a direita
+    // Ordenação Cronológica
     filteredData.sort((a, b) => {
       const dateA = new Date(`${a.data}T${a.hora}`);
       const dateB = new Date(`${b.data}T${b.hora}`);
       return dateA.getTime() - dateB.getTime();
     });
 
-    // 6. Formata para o Recharts
     return filteredData.map(r => ({
-      // Rótulo do eixo X: Data (dia/mês) + Hora
       label: `${new Date(r.data).toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})} ${r.hora.slice(0, 5)}`,
       fullDate: `${new Date(r.data).toLocaleDateString('pt-BR')} às ${r.hora}`,
       umidade: parseFloat(r.umidade),
@@ -49,10 +46,15 @@ export function MoistureTrends({ records }: { records: any[] }) {
     }));
   }, [records, selectedForno, dateStart, dateEnd]);
 
-  // Lista de fornos disponíveis para o filtro
-  const fornosDisponiveis = Array.from(new Set(records.map(r => r.forno.toString()))).sort();
+  // Lógica para listar os fornos:
+  // Pega os fornos existentes nos registros OU usa 1, 2, 3 como padrão se não tiver nada ainda
+  const fornosDisponiveis = useMemo(() => {
+    const fornosReais = Array.from(new Set(records.map(r => r.forno.toString()))).sort();
+    // Se não tiver registro nenhum, mostra pelo menos 1, 2 e 3 para não ficar vazio
+    if (fornosReais.length === 0) return ["1", "2", "3"];
+    return fornosReais;
+  }, [records]);
 
-  // Função para limpar filtros
   const clearFilters = () => {
     setSelectedForno("all");
     setDateStart("");
@@ -62,7 +64,7 @@ export function MoistureTrends({ records }: { records: any[] }) {
   return (
     <Card className="border-t-4 border-t-green-600 shadow-xl bg-white animate-in fade-in duration-700">
       <CardHeader className="pb-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
           
           {/* Título */}
           <div className="space-y-1">
@@ -74,18 +76,18 @@ export function MoistureTrends({ records }: { records: any[] }) {
             </p>
           </div>
 
-          {/* Área de Filtros */}
-          <div className="flex flex-wrap items-end gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
+          {/* Área de Filtros - Agora com inputs maiores */}
+          <div className="flex flex-col sm:flex-row flex-wrap items-end gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100 w-full xl:w-auto">
             
-            {/* Filtro Forno */}
-            <div className="space-y-1">
+            {/* Filtro Forno - Aumentei a largura */}
+            <div className="space-y-1 w-full sm:w-auto">
               <span className="text-[10px] font-bold text-slate-500 uppercase ml-1">Forno</span>
               <Select value={selectedForno} onValueChange={setSelectedForno}>
-                <SelectTrigger className="w-[110px] h-9 text-xs font-bold bg-white border-slate-200">
-                  <SelectValue placeholder="Todos" />
+                <SelectTrigger className="w-full sm:w-[180px] h-10 text-sm font-bold bg-white border-slate-200">
+                  <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="all">Todos os Fornos</SelectItem>
                   {fornosDisponiveis.map(f => (
                     <SelectItem key={f} value={f}>Forno {f}</SelectItem>
                   ))}
@@ -93,38 +95,38 @@ export function MoistureTrends({ records }: { records: any[] }) {
               </Select>
             </div>
 
-            {/* Filtro Data Início */}
-            <div className="space-y-1">
-              <span className="text-[10px] font-bold text-slate-500 uppercase ml-1">De</span>
+            {/* Filtro Data Início - Aumentei para w-[160px] */}
+            <div className="space-y-1 w-full sm:w-auto">
+              <span className="text-[10px] font-bold text-slate-500 uppercase ml-1">Data Inicial</span>
               <Input 
                 type="date" 
                 value={dateStart}
                 onChange={(e) => setDateStart(e.target.value)}
-                className="w-[130px] h-9 text-xs bg-white border-slate-200"
+                className="w-full sm:w-[160px] h-10 text-sm bg-white border-slate-200 cursor-pointer"
               />
             </div>
 
-            {/* Filtro Data Fim */}
-            <div className="space-y-1">
-              <span className="text-[10px] font-bold text-slate-500 uppercase ml-1">Até</span>
+            {/* Filtro Data Fim - Aumentei para w-[160px] */}
+            <div className="space-y-1 w-full sm:w-auto">
+              <span className="text-[10px] font-bold text-slate-500 uppercase ml-1">Data Final</span>
               <Input 
                 type="date" 
                 value={dateEnd}
                 onChange={(e) => setDateEnd(e.target.value)}
-                className="w-[130px] h-9 text-xs bg-white border-slate-200"
+                className="w-full sm:w-[160px] h-10 text-sm bg-white border-slate-200 cursor-pointer"
               />
             </div>
 
-            {/* Botão Limpar (só aparece se tiver filtro ativo) */}
+            {/* Botão Limpar */}
             {(selectedForno !== "all" || dateStart || dateEnd) && (
               <Button 
                 variant="ghost" 
                 size="icon" 
                 onClick={clearFilters}
-                className="h-9 w-9 text-slate-400 hover:text-red-500 hover:bg-red-50"
+                className="h-10 w-10 text-slate-400 hover:text-red-500 hover:bg-red-50 mb-[1px]"
                 title="Limpar Filtros"
               >
-                <X size={16} />
+                <X size={20} />
               </Button>
             )}
           </div>
@@ -149,7 +151,7 @@ export function MoistureTrends({ records }: { records: any[] }) {
                   height={50}
                 />
                 <YAxis 
-                  domain={['auto', 'auto']} // Ajusta escala automática
+                  domain={['auto', 'auto']} 
                   fontSize={12} 
                   tickLine={false} 
                   axisLine={false} 
@@ -160,12 +162,11 @@ export function MoistureTrends({ records }: { records: any[] }) {
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                   labelStyle={{ color: '#64748b', fontWeight: 'bold', marginBottom: '5px' }}
                   cursor={{ stroke: '#22c55e', strokeWidth: 1, strokeDasharray: '5 5' }}
-                  // Customizando o tooltip para mostrar mais detalhes
                   formatter={(value: any, name: any, props: any) => [
                     <span className="text-green-700 font-bold text-lg">{value}%</span>, 
                     <span className="text-slate-600 font-medium">{props.payload.forno}</span>
                   ]}
-                  labelFormatter={(label) => label} // Usa o label formatado
+                  labelFormatter={(label) => label} 
                 />
                 <Legend verticalAlign="top" height={36}/>
                 <Line 
@@ -183,7 +184,7 @@ export function MoistureTrends({ records }: { records: any[] }) {
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-slate-400 bg-slate-50/50 rounded-xl border-2 border-dashed border-slate-200">
               <Filter className="h-10 w-10 mb-2 opacity-20" />
-              <p>Nenhum dado encontrado para este período/forno.</p>
+              <p>Nenhum dado encontrado com estes filtros.</p>
               <Button variant="link" onClick={clearFilters} className="text-green-600 font-bold">
                 Limpar filtros
               </Button>
@@ -194,9 +195,9 @@ export function MoistureTrends({ records }: { records: any[] }) {
         <div className="mt-4 p-4 bg-green-50 rounded-2xl border border-green-100 flex items-start gap-3">
           <Activity className="text-green-600 h-5 w-5 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-slate-700">
-            <p className="font-bold text-green-800">Análise de Tendência</p>
+            <p className="font-bold text-green-800">Dica de Operação:</p>
             <p className="leading-relaxed mt-1">
-              Use os filtros acima para isolar um forno específico e verificar a estabilidade da secagem ao longo dos dias. Linhas constantes indicam processo sob controle.
+              Use as datas para isolar um período específico (ex: turno de ontem). O gráfico mostra apenas os fornos que tiveram produção registrada nessas datas.
             </p>
           </div>
         </div>
