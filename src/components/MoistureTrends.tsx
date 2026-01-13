@@ -13,43 +13,44 @@ export function MoistureTrends({ records }: { records: any[] }) {
 
   // Processamento dos dados
   const chartData = useMemo(() => {
-    let filteredData = [...records];
+    // 1. Filtra os dados
+    let filteredData = records.filter(r => {
+      // Normaliza a data do registro para YYYY-MM-DD (ignorando hora e fuso)
+      const dataRegistro = r.data.toString().split('T')[0];
+      
+      // Filtro de Forno
+      if (selectedForno !== "all" && r.forno.toString() !== selectedForno) {
+        return false;
+      }
 
-    // Filtro por Forno
-    if (selectedForno !== "all") {
-      filteredData = filteredData.filter(r => r.forno.toString() === selectedForno);
-    }
+      // Filtro Data Inicial
+      if (dateStart && dataRegistro < dateStart) {
+        return false;
+      }
 
-    // Filtro por Data Inicial
-    if (dateStart) {
-      filteredData = filteredData.filter(r => r.data >= dateStart);
-    }
+      // Filtro Data Final
+      if (dateEnd && dataRegistro > dateEnd) {
+        return false;
+      }
 
-    // Filtro por Data Final
-    if (dateEnd) {
-      filteredData = filteredData.filter(r => r.data <= dateEnd);
-    }
+      return true;
+    });
 
-    // Ordenação Cronológica
+    // 2. Ordena Cronologicamente (Antigo -> Novo)
     filteredData.sort((a, b) => {
-      const dateA = new Date(`${a.data}T${a.hora}`);
-      const dateB = new Date(`${b.data}T${b.hora}`);
+      const dateA = new Date(`${a.data.toString().split('T')[0]}T${a.hora}`);
+      const dateB = new Date(`${b.data.toString().split('T')[0]}T${b.hora}`);
       return dateA.getTime() - dateB.getTime();
     });
 
-return filteredData.map(r => {
-      // CORREÇÃO: Quebra a string "2025-01-14" manualmente para não sofrer com fuso horário
-      // Pega apenas a parte da data (caso venha com tempo junto)
-      const dataLimpa = r.data.toString().split('T')[0]; 
-      const [ano, mes, dia] = dataLimpa.split('-');
+    // 3. Formata para o Gráfico
+    return filteredData.map(r => {
+      // Formata data visualmente (DD/MM)
+      const [ano, mes, dia] = r.data.toString().split('T')[0].split('-');
       
       return {
-        // Label do Eixo X: Dia/Mês + Hora
-        label: `${dia}/${mes} ${r.hora.slice(0, 5)}`,
-        
-        // Tooltip: Data Completa
-        fullDate: `${dia}/${mes}/${ano} às ${r.hora}`,
-        
+        label: `${dia}/${mes} ${r.hora.slice(0, 5)}`, // Eixo X
+        fullDate: `${dia}/${mes}/${ano} às ${r.hora}`, // Tooltip
         umidade: parseFloat(r.umidade),
         forno: `Forno ${r.forno}`,
         responsavel: r.responsavel
@@ -57,11 +58,9 @@ return filteredData.map(r => {
     });
   }, [records, selectedForno, dateStart, dateEnd]);
 
-  // Lógica para listar os fornos:
-  // Pega os fornos existentes nos registros OU usa 1, 2, 3 como padrão se não tiver nada ainda
+  // Lista de fornos disponíveis
   const fornosDisponiveis = useMemo(() => {
     const fornosReais = Array.from(new Set(records.map(r => r.forno.toString()))).sort();
-    // Se não tiver registro nenhum, mostra pelo menos 1, 2 e 3 para não ficar vazio
     if (fornosReais.length === 0) return ["1", "2", "3"];
     return fornosReais;
   }, [records]);
@@ -83,14 +82,13 @@ return filteredData.map(r => {
               <TrendingUp className="text-green-600" /> TENDÊNCIA DE UMIDADE
             </CardTitle>
             <p className="text-xs text-slate-400 uppercase font-bold tracking-widest">
-              Controle de Qualidade ({chartData.length} registros)
+              Controle de Qualidade ({chartData.length} registros visíveis)
             </p>
           </div>
 
-          {/* Área de Filtros - Agora com inputs maiores */}
+          {/* Filtros */}
           <div className="flex flex-col sm:flex-row flex-wrap items-end gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100 w-full xl:w-auto">
             
-            {/* Filtro Forno - Aumentei a largura */}
             <div className="space-y-1 w-full sm:w-auto">
               <span className="text-[10px] font-bold text-slate-500 uppercase ml-1">Forno</span>
               <Select value={selectedForno} onValueChange={setSelectedForno}>
@@ -106,7 +104,6 @@ return filteredData.map(r => {
               </Select>
             </div>
 
-            {/* Filtro Data Início - Aumentei para w-[160px] */}
             <div className="space-y-1 w-full sm:w-auto">
               <span className="text-[10px] font-bold text-slate-500 uppercase ml-1">Data Inicial</span>
               <Input 
@@ -117,7 +114,6 @@ return filteredData.map(r => {
               />
             </div>
 
-            {/* Filtro Data Fim - Aumentei para w-[160px] */}
             <div className="space-y-1 w-full sm:w-auto">
               <span className="text-[10px] font-bold text-slate-500 uppercase ml-1">Data Final</span>
               <Input 
@@ -128,7 +124,6 @@ return filteredData.map(r => {
               />
             </div>
 
-            {/* Botão Limpar */}
             {(selectedForno !== "all" || dateStart || dateEnd) && (
               <Button 
                 variant="ghost" 
@@ -177,7 +172,10 @@ return filteredData.map(r => {
                     <span className="text-green-700 font-bold text-lg">{value}%</span>, 
                     <span className="text-slate-600 font-medium">{props.payload.forno}</span>
                   ]}
-                  labelFormatter={(label) => label} 
+                  labelFormatter={(label, payload) => {
+                    if (payload && payload.length > 0) return payload[0].payload.fullDate;
+                    return label;
+                  }} 
                 />
                 <Legend verticalAlign="top" height={36}/>
                 <Line 
@@ -195,7 +193,7 @@ return filteredData.map(r => {
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-slate-400 bg-slate-50/50 rounded-xl border-2 border-dashed border-slate-200">
               <Filter className="h-10 w-10 mb-2 opacity-20" />
-              <p>Nenhum dado encontrado com estes filtros.</p>
+              <p>Nenhum registro encontrado para este filtro.</p>
               <Button variant="link" onClick={clearFilters} className="text-green-600 font-bold">
                 Limpar filtros
               </Button>
@@ -206,9 +204,9 @@ return filteredData.map(r => {
         <div className="mt-4 p-4 bg-green-50 rounded-2xl border border-green-100 flex items-start gap-3">
           <Activity className="text-green-600 h-5 w-5 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-slate-700">
-            <p className="font-bold text-green-800">Dica de Operação:</p>
+            <p className="font-bold text-green-800">Dica de Análise:</p>
             <p className="leading-relaxed mt-1">
-              Use as datas para isolar um período específico (ex: turno de ontem). O gráfico mostra apenas os fornos que tiveram produção registrada nessas datas.
+              Para ver apenas o dia de hoje, selecione a mesma data nos campos "De" e "Até".
             </p>
           </div>
         </div>
