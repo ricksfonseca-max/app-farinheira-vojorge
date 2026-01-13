@@ -37,13 +37,24 @@ export function MoistureTrends({ records }: { records: any[] }) {
       return dateA.getTime() - dateB.getTime();
     });
 
-    return filteredData.map(r => ({
-      label: `${new Date(r.data).toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})} ${r.hora.slice(0, 5)}`,
-      fullDate: `${new Date(r.data).toLocaleDateString('pt-BR')} às ${r.hora}`,
-      umidade: parseFloat(r.umidade),
-      forno: `Forno ${r.forno}`,
-      responsavel: r.responsavel
-    }));
+return filteredData.map(r => {
+      // CORREÇÃO: Quebra a string "2025-01-14" manualmente para não sofrer com fuso horário
+      // Pega apenas a parte da data (caso venha com tempo junto)
+      const dataLimpa = r.data.toString().split('T')[0]; 
+      const [ano, mes, dia] = dataLimpa.split('-');
+      
+      return {
+        // Label do Eixo X: Dia/Mês + Hora
+        label: `${dia}/${mes} ${r.hora.slice(0, 5)}`,
+        
+        // Tooltip: Data Completa
+        fullDate: `${dia}/${mes}/${ano} às ${r.hora}`,
+        
+        umidade: parseFloat(r.umidade),
+        forno: `Forno ${r.forno}`,
+        responsavel: r.responsavel
+      };
+    });
   }, [records, selectedForno, dateStart, dateEnd]);
 
   // Lógica para listar os fornos:
