@@ -6,8 +6,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Trash2, Calendar, Clock, Thermometer, User, Layers, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Trash2, AlertCircle } from "lucide-react";
 import type { ProductionRecord } from "@/types/production";
 
 interface ProductionTableProps {
@@ -16,90 +16,92 @@ interface ProductionTableProps {
 }
 
 export function ProductionTable({ records, onDelete }: ProductionTableProps) {
-  if (records.length === 0) {
-    return (
-      <div className="p-12 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200">
-        <p className="text-slate-400 font-medium">Nenhum registro encontrado no MySQL.</p>
-      </div>
-    );
-  }
+  
+  // Função auxiliar para formatar a data sem fuso horário
+  const formatarData = (dataString: string) => {
+    if (!dataString) return "-";
+    // Pega "2025-01-14", divide em pedaços, inverte e junta com barra
+    // Resultado: "14/01/2025" (Blindado contra Timezone)
+    return dataString.toString().split('T')[0].split('-').reverse().join('/');
+  };
 
   return (
-    <div className="relative overflow-x-auto">
+    <div className="overflow-x-auto">
       <Table>
         <TableHeader className="bg-slate-50">
           <TableRow>
-            <TableHead className="font-bold text-slate-700">
-              <div className="flex items-center gap-2"><Calendar size={14} /> Data</div>
-            </TableHead>
-            <TableHead className="font-bold text-slate-700 text-center">
-              <div className="flex items-center justify-center gap-2"><Clock size={14} /> Hora</div>
-            </TableHead>
-            <TableHead className="font-bold text-slate-700 text-center">
-              <div className="flex items-center justify-center gap-2"><Tag size={14} /> Forno</div>
-            </TableHead>
-            <TableHead className="font-bold text-slate-700 text-center">
-              <div className="flex items-center justify-center gap-2"><Thermometer size={14} /> Umidade</div>
-            </TableHead>
-            <TableHead className="font-bold text-slate-700">
-              <div className="flex items-center gap-2"><Layers size={14} /> Tipo / Peneira</div>
-            </TableHead>
-            <TableHead className="font-bold text-slate-700">
-              <div className="flex items-center gap-2"><User size={14} /> Responsável</div>
-            </TableHead>
+            <TableHead className="font-bold text-slate-700">Data</TableHead>
+            <TableHead className="font-bold text-slate-700">Hora</TableHead>
+            <TableHead className="font-bold text-slate-700">Forno</TableHead>
+            <TableHead className="font-bold text-slate-700">Umidade</TableHead>
+            <TableHead className="font-bold text-slate-700 hidden sm:table-cell">Tipo</TableHead>
+            <TableHead className="font-bold text-slate-700 hidden md:table-cell">Resp.</TableHead>
             <TableHead className="text-right font-bold text-slate-700">Ações</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {records.map((record) => (
-            <TableRow key={record.id} className="hover:bg-green-50/50 transition-colors">
-              <TableCell className="font-medium text-slate-600">
-                {new Date(record.data).toLocaleDateString('pt-BR')}
-              </TableCell>
-              
-              <TableCell className="text-center text-slate-600 font-mono">
-                {record.hora}
-              </TableCell>
-
-              <TableCell className="text-center">
-                <span className="inline-flex items-center justify-center bg-green-100 text-green-800 text-xs font-bold px-2.5 py-1 rounded-full border border-green-200">
-                  Forno {record.forno}
-                </span>
-              </TableCell>
-
-              <TableCell className="text-center font-bold text-slate-700">
-                {record.umidade}%
-              </TableCell>
-
-              <TableCell>
-                <div className="flex flex-col">
-                  <span className="text-sm font-bold text-slate-700">{record.tipoFarinha}</span>
-                  <span className="text-[10px] uppercase text-slate-400 font-bold tracking-tighter">
-                    Peneira: {record.peneira}
-                  </span>
+          {records.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={7} className="text-center h-32 text-slate-400">
+                <div className="flex flex-col items-center justify-center gap-2">
+                  <AlertCircle className="h-8 w-8 opacity-20" />
+                  <p>Nenhum registro encontrado hoje.</p>
                 </div>
               </TableCell>
-
-              <TableCell className="text-slate-600 italic">
-                {record.responsavel}
-              </TableCell>
-
-              <TableCell className="text-right">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => {
-                    if (window.confirm("Deseja realmente excluir este registro da Indústria Vô Jorge?")) {
-                      onDelete(record.id);
-                    }
-                  }}
-                  className="text-slate-300 hover:text-red-600 hover:bg-red-50 transition-all"
-                >
-                  <Trash2 size={18} />
-                </Button>
-              </TableCell>
             </TableRow>
-          ))}
+          ) : (
+            records.map((record) => (
+              <TableRow key={record.id} className="hover:bg-slate-50 transition-colors">
+                
+                {/* ✅ AQUI ESTÁ A CORREÇÃO DA DATA */}
+                <TableCell className="font-medium text-slate-700">
+                  {formatarData(record.data)}
+                </TableCell>
+
+                <TableCell className="text-slate-600">
+                  {record.hora.slice(0, 5)}
+                </TableCell>
+                
+                <TableCell>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800 border border-slate-200">
+                    Forno {record.forno}
+                  </span>
+                </TableCell>
+                
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <span className={`font-bold ${
+                      record.umidade > 13 || record.umidade < 10 
+                        ? "text-red-600" 
+                        : "text-green-600"
+                    }`}>
+                      {record.umidade}%
+                    </span>
+                  </div>
+                </TableCell>
+                
+                <TableCell className="hidden sm:table-cell text-slate-500 text-sm">
+                  {record.tipoFarinha}
+                </TableCell>
+                
+                <TableCell className="hidden md:table-cell text-slate-500 text-sm capitalize">
+                  {record.responsavel}
+                </TableCell>
+                
+                <TableCell className="text-right">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onDelete(record.id)}
+                    className="text-slate-300 hover:text-red-600 hover:bg-red-50 transition-all"
+                    title="Excluir registro"
+                  >
+                    <Trash2 size={16} />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
         </TableBody>
       </Table>
     </div>
