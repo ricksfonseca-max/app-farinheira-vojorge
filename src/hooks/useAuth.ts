@@ -28,7 +28,7 @@ export function useAuth() {
   }, []);
 
   // LOGIN
-  const signIn = async (email: string, senha: string) => { // Agora pede email e senha
+  const signIn = async (email: string, senha: string) => {
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE}/login`, {
@@ -41,10 +41,20 @@ export function useAuth() {
 
       if (!response.ok) throw new Error(data.error || "Erro ao entrar");
 
+      // 1. Salva a sessão
       localStorage.setItem("vj_user_session", JSON.stringify(data.user));
       setUser(data.user);
       
-      toast({ title: `Bem-vindo, ${data.user.name}!` });
+      toast({ 
+        title: `Bem-vindo, ${data.user.name}!`,
+        className: "bg-green-600 text-white border-none"
+      });
+
+      // 2. TRUQUE DE MESTRE: Recarrega a página após 1 segundo para entrar no sistema
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+
     } catch (error: any) {
       toast({ variant: "destructive", title: "Erro", description: error.message });
     } finally {
@@ -52,7 +62,7 @@ export function useAuth() {
     }
   };
 
-  // CADASTRO (NOVA FUNÇÃO)
+  // CADASTRO
   const signUp = async (nome: string, email: string, senha: string) => {
     setLoading(true);
     try {
@@ -67,12 +77,12 @@ export function useAuth() {
       if (!response.ok) throw new Error(data.error || "Erro ao cadastrar");
 
       toast({ 
-        title: "Conta criada!", 
-        description: "Agora faça login com seus dados.",
+        title: "Conta criada com sucesso!", 
+        description: "Faça login para entrar.",
         className: "bg-green-600 text-white border-none" 
       });
       
-      return true; // Retorna sucesso para a tela mudar para login
+      return true;
     } catch (error: any) {
       toast({ variant: "destructive", title: "Erro", description: error.message });
       return false;
@@ -84,6 +94,7 @@ export function useAuth() {
   const signOut = () => {
     localStorage.removeItem("vj_user_session");
     setUser(null);
+    window.location.reload(); // Recarrega ao sair também
   };
 
   return { user, loading, signIn, signUp, signOut };
