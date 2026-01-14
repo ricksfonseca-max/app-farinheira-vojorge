@@ -1,41 +1,90 @@
 import { useState, useEffect } from "react";
+import { toast } from "@/components/ui/use-toast";
+
+interface User {
+  name: string;
+  email: string;
+  token?: string;
+}
+
+// URL base do Node-RED
+const API_BASE = "https://nodered-vojorge.fsk.tec.br/api/auth";
 
 export function useAuth() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Recuperar sessão ao abrir
   useEffect(() => {
-    const checkAuth = () => {
+    const savedUser = localStorage.getItem("vj_user_session");
+    if (savedUser) {
       try {
-        const savedUser = sessionStorage.getItem("farinheira_user");
-        if (savedUser) {
-          setUser(JSON.parse(savedUser));
-        }
+        setUser(JSON.parse(savedUser));
       } catch (e) {
-        console.error("Erro na sessão", e);
-      } finally {
-        setLoading(false);
+        localStorage.removeItem("vj_user_session");
       }
-    };
-    checkAuth();
+    }
+    setLoading(false);
   }, []);
 
-  const signIn = async (email: string, pass: string) => {
-    if (pass === "jorge123") {
-      const userData = { id: "1", email, name: email.split('@')[0] };
-      sessionStorage.setItem("farinheira_user", JSON.stringify(userData));
-      setUser(userData);
-      // O reload garante que o Index.tsx perceba a mudança
-      window.location.href = "/"; 
-      return { error: null };
+  // LOGIN
+  const signIn = async (email: string, senha: string) => { // Agora pede email e senha
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, senha }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.error || "Erro ao entrar");
+
+      localStorage.setItem("vj_user_session", JSON.stringify(data.user));
+      setUser(data.user);
+      
+      toast({ title: `Bem-vindo, ${data.user.name}!` });
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Erro", description: error.message });
+    } finally {
+      setLoading(false);
     }
-    return { error: { message: "Senha incorreta (use jorge123)" } };
+  };
+
+  // CADASTRO (NOVA FUNÇÃO)
+  const signUp = async (nome: string, email: string, senha: string) => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nome, email, senha }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.error || "Erro ao cadastrar");
+
+      toast({ 
+        title: "Conta criada!", 
+        description: "Agora faça login com seus dados.",
+        className: "bg-green-600 text-white border-none" 
+      });
+      
+      return true; // Retorna sucesso para a tela mudar para login
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Erro", description: error.message });
+      return false;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signOut = () => {
-    sessionStorage.removeItem("farinheira_user");
-    window.location.href = "/";
+    localStorage.removeItem("vj_user_session");
+    setUser(null);
   };
 
-  return { user, loading, signIn, signOut };
+  return { user, loading, signIn, signUp, signOut };
 }
