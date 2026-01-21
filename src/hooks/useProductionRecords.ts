@@ -1,44 +1,47 @@
 import { useState, useEffect } from "react";
 import { toast } from "@/components/ui/use-toast";
 
-// Definindo a interface aqui para garantir que o campo foto exista
+// Interface completa com TODOS os dados
 export interface ProductionRecord {
   id: number;
   data: string;
   hora: string;
   umidade: number;
   forno: string;
+  tipoFarinha: string; // Restaurado
+  peneira: string;     // Restaurado (A Bica)
   responsavel: string;
-  foto?: string; // <--- NOVO CAMPO
+  foto?: string;       // A Foto
 }
 
-// URL da API (Ajuste se estiver usando o domínio novo do Cloudflare ou mantenha o antigo se estiver funcionando)
-// Recomendado usar o novo se configurou: "https://api.fsk.tec.br/api/producao"
+// Interface para o envio (sem id/data/hora pois geramos no envio)
+export interface ProductionFormData {
+  umidade: number;
+  forno: string;
+  tipoFarinha: string;
+  peneira: string;
+  foto?: string;
+}
+
+// URL DO NODE-RED (Se estiver usando dominio novo):
 const API_URL = "https://nodered-vojorge.fsk.tec.br/api/producao"; 
 
 export function useProductionRecords() {
   const [records, setRecords] = useState<ProductionRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 1. BUSCAR DADOS (GET)
+  // 1. BUSCAR DADOS
   const fetchRecords = async () => {
     try {
       const response = await fetch(API_URL);
-      
-      if (!response.ok) {
-        throw new Error(`Erro HTTP: ${response.status}`);
-      }
-      
+      if (!response.ok) throw new Error(`Erro HTTP: ${response.status}`);
       const data = await response.json();
       setRecords(data);
     } catch (error) {
-      console.error("Erro na conexão com Node-RED:", error);
+      console.error("Erro Node-RED:", error);
+      // Evita spam de erro se já tiver dados na tela
       if (records.length === 0) {
-        toast({ 
-          title: "Sem conexão", 
-          description: "Verifique se o servidor está rodando.", 
-          variant: "destructive" 
-        });
+        toast({ title: "Aguardando conexão...", variant: "destructive" });
       }
     } finally {
       setLoading(false);
@@ -47,27 +50,23 @@ export function useProductionRecords() {
 
   useEffect(() => {
     fetchRecords();
-    const interval = setInterval(fetchRecords, 30000);
+    const interval = setInterval(fetchRecords, 15000); // Atualiza a cada 15s
     return () => clearInterval(interval);
   }, []);
 
-  // 2. SALVAR DADOS (POST) - ATUALIZADO COM FOTO
-  // Agora aceita argumentos individuais para facilitar o envio da foto
-  const addRecord = async (umidade: number, forno: string, usuario: string, foto: string = "") => {
-    
-    // Pega data/hora do momento do clique
+  // 2. SALVAR DADOS (Agora recebe o objeto completo)
+  const addRecord = async (formData: ProductionFormData, usuario: string) => {
     const now = new Date();
     const dataAtual = now.toISOString().split('T')[0];
     const horaAtual = now.toTimeString().split(' ')[0];
 
+    // Monta o pacote completo para o Node-RED
     const payload = {
       data: dataAtual,
       hora: horaAtual,
-      umidade,
-      forno,
-      usuario,
+      usuario: usuario,
       responsavel: usuario,
-      foto // <--- ENVIA A FOTO
+      ...formData // Espalha: umidade, forno, tipoFarinha, peneira, foto
     };
 
     try {
@@ -79,38 +78,28 @@ export function useProductionRecords() {
 
       if (response.ok) {
         toast({ 
-          title: "Sucesso!", 
-          description: "Registro salvo com evidência.",
+          title: "Salvo com sucesso!", 
           className: "bg-green-600 text-white border-none"
         });
-        fetchRecords(); // Atualiza a tabela imediatamente
+        fetchRecords(); 
         return true;
       } else {
-        throw new Error("Falha ao salvar");
+        throw new Error("Erro no servidor");
       }
     } catch (error) {
-      toast({ 
-        title: "Erro ao Salvar", 
-        description: "Não foi possível conectar ao servidor.",
-        variant: "destructive" 
-      });
+      toast({ title: "Erro ao salvar", description: "Verifique a conexão.", variant: "destructive" });
       return false;
     }
   };
 
-  // 3. APAGAR DADOS (DELETE)
+  // 3. DELETAR
   const deleteRecord = async (id: number) => {
     try {
-      const response = await fetch(`${API_URL}?id=${id}`, {
-        method: "DELETE",
-      });
-
-      if (response.ok) {
-        toast({ title: "Registro removido." });
-        fetchRecords();
-      }
+      await fetch(`${API_URL}?id=${id}`, { method: "DELETE" });
+      toast({ title: "Apagado." });
+      fetchRecords();
     } catch (error) {
-      toast({ title: "Erro ao excluir", variant: "destructive" });
+      console.error(error);
     }
   };
 
