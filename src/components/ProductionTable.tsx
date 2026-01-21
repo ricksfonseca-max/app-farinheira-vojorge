@@ -1,109 +1,167 @@
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+import { useState } from "react";
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Trash2, AlertCircle } from "lucide-react";
+import { Trash2, Eye, Image as ImageIcon, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import type { ProductionRecord } from "@/types/production";
+import { format } from "date-fns"; // Se não tiver date-fns, usaremos JS nativo abaixo
 
 interface ProductionTableProps {
   records: ProductionRecord[];
-  onDelete: (id: string) => void;
+  onDelete: (id: number) => void;
 }
 
 export function ProductionTable({ records, onDelete }: ProductionTableProps) {
-  
-  // Função auxiliar para formatar a data sem fuso horário
-  const formatarData = (dataString: string) => {
-    if (!dataString) return "-";
-    // Pega "2025-01-14", divide em pedaços, inverte e junta com barra
-    // Resultado: "14/01/2025" (Blindado contra Timezone)
-    return dataString.toString().split('T')[0].split('-').reverse().join('/');
+  // Estado para controlar qual imagem está aberta no Zoom
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
+  // Função para formatar data e hora bonitinho
+  const formatDate = (dateString: string, timeString: string) => {
+    try {
+      const date = new Date(`${dateString}T${timeString}`);
+      return date.toLocaleString('pt-BR', { 
+        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' 
+      });
+    } catch (e) {
+      return `${dateString} ${timeString}`;
+    }
   };
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader className="bg-slate-50">
-          <TableRow>
-            <TableHead className="font-bold text-slate-700">Data</TableHead>
-            <TableHead className="font-bold text-slate-700">Hora</TableHead>
-            <TableHead className="font-bold text-slate-700">Forno</TableHead>
-            <TableHead className="font-bold text-slate-700">Umidade</TableHead>
-            <TableHead className="font-bold text-slate-700 hidden sm:table-cell">Tipo</TableHead>
-            <TableHead className="font-bold text-slate-700 hidden md:table-cell">Resp.</TableHead>
-            <TableHead className="text-right font-bold text-slate-700">Ações</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {records.length === 0 ? (
+    <>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
             <TableRow>
-              <TableCell colSpan={7} className="text-center h-32 text-slate-400">
-                <div className="flex flex-col items-center justify-center gap-2">
-                  <AlertCircle className="h-8 w-8 opacity-20" />
-                  <p>Nenhum registro encontrado hoje.</p>
-                </div>
-              </TableCell>
+              <TableHead className="w-[140px]">Data / Hora</TableHead>
+              <TableHead className="text-center">Umidade</TableHead>
+              <TableHead>Forno</TableHead>
+              <TableHead>Farinha</TableHead>
+              <TableHead>Bica</TableHead>
+              <TableHead className="text-center">Evidência</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
             </TableRow>
-          ) : (
-            records.map((record) => (
-              <TableRow key={record.id} className="hover:bg-slate-50 transition-colors">
-                
-                {/* ✅ AQUI ESTÁ A CORREÇÃO DA DATA */}
-                <TableCell className="font-medium text-slate-700">
-                  {formatarData(record.data)}
-                </TableCell>
-
-                <TableCell className="text-slate-600">
-                  {record.hora.slice(0, 5)}
-                </TableCell>
-                
-                <TableCell>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800 border border-slate-200">
-                    Forno {record.forno}
-                  </span>
-                </TableCell>
-                
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <span className={`font-bold ${
-                      record.umidade > 13 || record.umidade < 10 
-                        ? "text-red-600" 
-                        : "text-green-600"
-                    }`}>
-                      {record.umidade}%
-                    </span>
-                  </div>
-                </TableCell>
-                
-                <TableCell className="hidden sm:table-cell text-slate-500 text-sm">
-                  {record.tipoFarinha}
-                </TableCell>
-                
-                <TableCell className="hidden md:table-cell text-slate-500 text-sm capitalize">
-                  {record.responsavel}
-                </TableCell>
-                
-                <TableCell className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onDelete(record.id)}
-                    className="text-slate-300 hover:text-red-600 hover:bg-red-50 transition-all"
-                    title="Excluir registro"
-                  >
-                    <Trash2 size={16} />
-                  </Button>
+          </TableHeader>
+          <TableBody>
+            {records.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8 text-slate-400">
+                  Nenhum registro encontrado hoje.
                 </TableCell>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    </div>
+            ) : (
+              records.map((rec) => (
+                <TableRow key={rec.id} className="hover:bg-slate-50 transition-colors">
+                  {/* Data e Hora */}
+                  <TableCell className="font-medium text-xs text-slate-500">
+                    {formatDate(rec.data, rec.hora)}
+                    <div className="text-[10px] text-slate-400 uppercase">{rec.responsavel}</div>
+                  </TableCell>
+
+                  {/* Umidade (Com cor de alerta) */}
+                  <TableCell className="text-center">
+                    <span className={`font-bold px-2 py-1 rounded ${
+                      rec.umidade >= 13.5 ? "bg-red-100 text-red-700" :
+                      rec.umidade <= 11.5 ? "bg-yellow-100 text-yellow-700" :
+                      "bg-green-100 text-green-700"
+                    }`}>
+                      {Number(rec.umidade).toFixed(1)}%
+                    </span>
+                  </TableCell>
+
+                  {/* Forno */}
+                  <TableCell className="text-xs">{rec.forno}</TableCell>
+
+                  {/* Farinha (Nova Coluna) */}
+                  <TableCell>
+                    <Badge variant="outline" className="text-slate-600 border-slate-300 font-normal">
+                      {rec.tipoFarinha}
+                    </Badge>
+                  </TableCell>
+
+                  {/* Bica / Peneira (Nova Coluna) */}
+                  <TableCell className="text-xs text-slate-600">
+                    {rec.peneira}
+                  </TableCell>
+
+                  {/* Foto (Botão de Visualizar) */}
+                  <TableCell className="text-center">
+                    {rec.foto && rec.foto.length > 50 ? (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                        onClick={() => setSelectedImage(rec.foto!)}
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        Ver
+                      </Button>
+                    ) : (
+                      <span className="text-slate-300 text-xs">-</span>
+                    )}
+                  </TableCell>
+
+                  {/* Botão Excluir */}
+                  <TableCell className="text-right">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => onDelete(rec.id)}
+                      className="text-slate-400 hover:text-red-600 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* --- MODAL DE ZOOM DA FOTO --- */}
+      {/* Isso cria uma janela preta sobre a tela quando clica na foto */}
+      {selectedImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="relative bg-white p-2 rounded-lg shadow-2xl max-w-3xl max-h-[90vh] flex flex-col">
+            {/* Botão Fechar */}
+            <Button 
+              variant="destructive" 
+              size="icon" 
+              className="absolute -top-4 -right-4 rounded-full shadow-md z-10"
+              onClick={() => setSelectedImage(null)}
+            >
+              <X className="h-5 w-5" />
+            </Button>
+            
+            {/* A Imagem Grande */}
+            <div className="overflow-auto rounded-md">
+              <img 
+                src={selectedImage} 
+                alt="Evidência" 
+                className="w-full h-auto object-contain max-h-[80vh]" 
+              />
+            </div>
+            
+            <p className="text-center text-xs text-slate-400 mt-2 font-mono">
+              Evidência visual do registro
+            </p>
+          </div>
+          
+          {/* Clicar fora também fecha */}
+          <div 
+            className="absolute inset-0 -z-10" 
+            onClick={() => setSelectedImage(null)}
+          ></div>
+        </div>
+      )}
+    </>
   );
 }
