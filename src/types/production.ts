@@ -1,21 +1,22 @@
+// Adicionamos o campo 'foto' (opcional) nas duas interfaces
+
 export interface ProductionRecord {
-  id: string;
+  id: number;
   data: string;
   hora: string;
-  forno: string;
   umidade: number;
-  tipoFarinha: string;
-  peneira: string;
+  forno: string;
+  tipoFarinha: string; // Campo mantido
+  peneira: string;     // A famosa Bica
   responsavel: string;
-  createdAt: string;
+  foto?: string;       // <--- NOVO CAMPO
 }
 
-export type ProductionFormData = {
-  data: string;
-  hora: string;
+export interface ProductionFormData {
+  umidade: number;
   forno: string;
-  umidade: string;
   tipoFarinha: string;
   peneira: string;
-  responsavel: string;
-};
+  usuario: string;     // Importante para saber quem enviou
+  foto?: string;       // <--- NOVO CAMPO
+}
