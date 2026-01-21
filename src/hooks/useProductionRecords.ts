@@ -18,20 +18,16 @@ export function useProductionRecords() {
       
       const rawData = await response.json();
 
-      // --- CORREÇÃO DE MAPEAMENTO ---
-      // O banco manda 'tipo_farinha', nós convertemos para 'tipoFarinha'
+      // Corrige mapeamento (tipo_farinha -> tipoFarinha)
       const formattedData = rawData.map((item: any) => ({
         ...item,
-        tipoFarinha: item.tipo_farinha || item.tipoFarinha || "Não Informado", // Garante que apareça
+        tipoFarinha: item.tipo_farinha || item.tipoFarinha || "Não Informado",
         peneira: item.peneira || "Bica ??"
       }));
 
       setRecords(formattedData);
     } catch (error) {
       console.error("Erro Node-RED:", error);
-      if (records.length === 0) {
-        toast({ title: "Sem conexão", variant: "destructive" });
-      }
     } finally {
       setLoading(false);
     }
@@ -43,9 +39,12 @@ export function useProductionRecords() {
     return () => clearInterval(interval);
   }, []);
 
-  // 2. SALVAR
-  const addRecord = async (formData: Omit<ProductionFormData, "usuario">) => {
-    if (!user) return;
+  // 2. SALVAR (Agora retorna TRUE ou FALSE)
+  const addRecord = async (formData: Omit<ProductionFormData, "usuario">): Promise<boolean> => {
+    if (!user) {
+      toast({ title: "Erro", description: "Usuário desconectado", variant: "destructive" });
+      return false;
+    }
 
     const payload = {
       ...formData,
@@ -63,14 +62,17 @@ export function useProductionRecords() {
       if (response.ok) {
         toast({ 
           title: "Sucesso!", 
+          description: "Registro e foto enviados.",
           className: "bg-green-600 text-white border-none"
         });
-        fetchRecords(); 
+        fetchRecords(); // Atualiza a lista
+        return true; // <--- AVISA QUE DEU CERTO
       } else {
         throw new Error("Erro no servidor");
       }
     } catch (error) {
       toast({ title: "Erro ao Salvar", variant: "destructive" });
+      return false; // <--- AVISA QUE DEU ERRO
     }
   };
 
