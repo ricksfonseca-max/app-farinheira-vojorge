@@ -1,93 +1,91 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "@/components/ui/use-toast";
-import type { ProductionRecord, ProductionFormData } from "@/types/production";
 
-// ✅ URL OFICIAL DA INDÚSTRIA VÔ JORGE CONECTADA:
-const API_URL = "https://nodered-vojorge.fsk.tec.br/api/producao"; 
+export interface ProductionRecord {
+  id: number;
+  data: string; // Formato YYYY-MM-DD
+  hora: string; // Formato HH:MM:SS
+  umidade: number;
+  forno: string;
+  responsavel: string;
+  foto?: string; // Campo opcional para a imagem Base64
+}
+
+// URL da API (ajuste se estiver usando localhost ou dominio)
+const API_BASE = "https://api.fsk.tec.br/api"; 
+// Se ainda estiver testando local sem dominio, use o IP: "http://SEU_IP:1880/api"
 
 export function useProductionRecords() {
   const [records, setRecords] = useState<ProductionRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 1. BUSCAR DADOS (GET)
-  const fetchRecords = async () => {
+  // Buscar registros
+  const fetchRecords = useCallback(async () => {
     try {
-      // setLoading(true); // Comentado para evitar piscar a tela em atualizações silenciosas
-      const response = await fetch(API_URL);
-      
-      if (!response.ok) {
-        throw new Error(`Erro HTTP: ${response.status}`);
-      }
-      
+      const response = await fetch(`${API_BASE}/producao`);
+      if (!response.ok) throw new Error("Erro ao buscar dados");
       const data = await response.json();
       setRecords(data);
     } catch (error) {
-      console.error("Erro na conexão com Node-RED:", error);
-      // Só mostra erro se a lista estiver vazia para não incomodar o operador
-      if (records.length === 0) {
-        toast({ 
-          title: "Sem conexão com a Fábrica", 
-          description: "Verifique se o Node-RED está rodando.", 
-          variant: "destructive" 
-        });
-      }
+      console.error("Erro ao carregar registros:", error);
+      toast({ 
+        variant: "destructive", 
+        title: "Erro de Conexão", 
+        description: "Não foi possível carregar o histórico." 
+      });
     } finally {
       setLoading(false);
     }
-  };
-
-  // Carrega os dados assim que a tela abre
-  useEffect(() => {
-    fetchRecords();
-    
-    // Opcional: Atualiza a cada 30 segundos automaticamente (bom para dashboards)
-    const interval = setInterval(fetchRecords, 30000);
-    return () => clearInterval(interval);
   }, []);
 
-  // 2. SALVAR DADOS (POST)
-  const addRecord = async (formData: ProductionFormData) => {
+  // Adicionar novo registro (AGORA COM FOTO)
+  const addRecord = async (umidade: number, forno: string, usuario: string, foto: string = "") => {
+    // Pegar Data e Hora atuais do dispositivo
+    const now = new Date();
+    const dataAtual = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    const horaAtual = now.toTimeString().split(' ')[0]; // HH:MM:SS
+
     try {
-      const response = await fetch(API_URL, {
+      const response = await fetch(`${API_BASE}/producao`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          data: dataAtual,
+          hora: horaAtual,
+          umidade,
+          forno,
+          usuario,      // Quem está enviando
+          responsavel: usuario, // Redundância para garantir
+          foto          // A string gigante da imagem
+        }),
       });
 
-      if (response.ok) {
-        toast({ 
-          title: "Sucesso!", 
-          description: "Registro de produção salvo no servidor.",
-          className: "bg-green-600 text-white border-none"
-        });
-        fetchRecords(); // Atualiza a tabela imediatamente
-      } else {
-        throw new Error("Falha ao salvar");
-      }
+      if (!response.ok) throw new Error("Erro ao salvar no servidor");
+
+      // Atualiza a lista localmente para parecer instantâneo
+      await fetchRecords();
+      
+      return true; // Sucesso
     } catch (error) {
+      console.error(error);
       toast({ 
+        variant: "destructive", 
         title: "Erro ao Salvar", 
-        description: "Não foi possível conectar ao banco de dados.",
-        variant: "destructive" 
+        description: "Verifique sua conexão e tente novamente." 
       });
+      return false; // Falha
     }
   };
 
-  // 3. APAGAR DADOS (DELETE)
-  const deleteRecord = async (id: string) => {
-    try {
-      const response = await fetch(`${API_URL}?id=${id}`, {
-        method: "DELETE",
-      });
+  // Carrega os dados ao abrir a tela
+  useEffect(() => {
+    fetchRecords();
+    // Atualiza a cada 30 segundos automaticamente
+    const interval = setInterval(fetchRecords, 30000);
+    return () => clearInterval(interval);
+  }, [fetchRecords]);
 
-      if (response.ok) {
-        toast({ title: "Registro removido com sucesso." });
-        fetchRecords(); // Atualiza a tabela
-      }
-    } catch (error) {
-      toast({ title: "Erro ao excluir", variant: "destructive" });
-    }
-  };
-
-  return { records, loading, addRecord, deleteRecord };
+  return { records, addRecord, loading, reload: fetchRecords };
 }
