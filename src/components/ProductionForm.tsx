@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react"; // <--- Adicionado useRef
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,6 @@ import { toast } from "@/components/ui/use-toast";
 import type { ProductionFormData } from "@/types/production";
 
 interface ProductionFormProps {
-  // O formulário envia tudo menos o usuário (que o hook injeta)
   onSubmit: (data: Omit<ProductionFormData, "usuario">) => Promise<void>;
 }
 
@@ -24,6 +23,9 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
   const [processingPhoto, setProcessingPhoto] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Referência para limpar o input de arquivo à força
+  const fileInputRef = useRef<HTMLInputElement>(null); // <--- O TRUQUE
+
   // --- LÓGICA DE COMPRESSÃO DA FOTO ---
   const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -34,7 +36,7 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement("canvas");
-          const MAX_WIDTH = 800; // Reduz para 800px para ficar leve
+          const MAX_WIDTH = 800; 
           const scaleSize = MAX_WIDTH / img.width;
           const finalWidth = img.width > MAX_WIDTH ? MAX_WIDTH : img.width;
           const finalHeight = img.width > MAX_WIDTH ? img.height * scaleSize : img.height;
@@ -56,6 +58,20 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
     }
   };
 
+  // Função para limpar tudo (usada após salvar ou ao cancelar foto)
+  const clearForm = () => {
+    setUmidade("");
+    setForno("");
+    setTipoFarinha("");
+    setPeneira("");
+    setFotoPreview(null);
+    
+    // Limpa o input de arquivo físico
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -67,22 +83,33 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
 
     setIsSubmitting(true);
 
-    // Envia o objeto formatado
-    await onSubmit({
-      umidade: Number(umidade),
-      forno,
-      tipoFarinha,
-      peneira,
-      foto: fotoPreview || "" // Envia vazio se não tiver foto
-    });
+    try {
+      // Envia o objeto formatado
+      await onSubmit({
+        umidade: Number(umidade),
+        forno,
+        tipoFarinha,
+        peneira,
+        foto: fotoPreview || "" 
+      });
 
-    // Limpa o formulário
-    setUmidade("");
-    setForno("");
-    setTipoFarinha("");
-    setPeneira("");
+      // Se chegou aqui, deu certo. Limpa TUDO!
+      clearForm(); 
+
+    } catch (error) {
+      // Se der erro, não limpa para o usuário tentar de novo
+      console.error(error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Função para remover a foto manualmente (botão X)
+  const removePhoto = () => {
     setFotoPreview(null);
-    setIsSubmitting(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   return (
@@ -154,8 +181,9 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
             
             {!fotoPreview ? (
               <div className="relative group">
-                {/* Input invisível que cobre o botão */}
+                {/* Input com Referência (Ref) para limpar depois */}
                 <input
+                  ref={fileInputRef} // <--- Conecta a referência aqui
                   type="file" accept="image/*" capture="environment"
                   onChange={handlePhotoCapture}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
@@ -173,7 +201,7 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
                 <Button
                   type="button" variant="destructive" size="icon"
                   className="absolute top-2 right-2 rounded-full shadow-md w-8 h-8"
-                  onClick={() => setFotoPreview(null)}
+                  onClick={removePhoto} // Usa a função nova de remover
                 >
                   <X className="h-4 w-4" />
                 </Button>
