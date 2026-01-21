@@ -1,4 +1,4 @@
-import { useState, useRef } from "react"; // <--- Adicionado useRef
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,8 @@ import { toast } from "@/components/ui/use-toast";
 import type { ProductionFormData } from "@/types/production";
 
 interface ProductionFormProps {
-  onSubmit: (data: Omit<ProductionFormData, "usuario">) => Promise<void>;
+  // Agora esperamos que a função retorne um booleano (promessa)
+  onSubmit: (data: Omit<ProductionFormData, "usuario">) => Promise<boolean>;
 }
 
 export function ProductionForm({ onSubmit }: ProductionFormProps) {
@@ -23,8 +24,9 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
   const [processingPhoto, setProcessingPhoto] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Referência para limpar o input de arquivo à força
-  const fileInputRef = useRef<HTMLInputElement>(null); // <--- O TRUQUE
+  // CHAVE MÁGICA DE RESET
+  // Toda vez que esse número mudar, o input de arquivo é destruído e recriado
+  const [resetKey, setResetKey] = useState(0);
 
   // --- LÓGICA DE COMPRESSÃO DA FOTO ---
   const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -47,7 +49,6 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
           const ctx = canvas.getContext("2d");
           ctx?.drawImage(img, 0, 0, finalWidth, finalHeight);
 
-          // Gera JPG Base64
           const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
           setFotoPreview(compressedBase64);
           setProcessingPhoto(false);
@@ -55,20 +56,6 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
         img.src = event.target?.result as string;
       };
       reader.readAsDataURL(file);
-    }
-  };
-
-  // Função para limpar tudo (usada após salvar ou ao cancelar foto)
-  const clearForm = () => {
-    setUmidade("");
-    setForno("");
-    setTipoFarinha("");
-    setPeneira("");
-    setFotoPreview(null);
-    
-    // Limpa o input de arquivo físico
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
     }
   };
 
@@ -83,33 +70,33 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
 
     setIsSubmitting(true);
 
-    try {
-      // Envia o objeto formatado
-      await onSubmit({
-        umidade: Number(umidade),
-        forno,
-        tipoFarinha,
-        peneira,
-        foto: fotoPreview || "" 
-      });
+    // Envia e espera a resposta (Sucesso ou Falha)
+    const sucesso = await onSubmit({
+      umidade: Number(umidade),
+      forno,
+      tipoFarinha,
+      peneira,
+      foto: fotoPreview || "" 
+    });
 
-      // Se chegou aqui, deu certo. Limpa TUDO!
-      clearForm(); 
+    setIsSubmitting(false);
 
-    } catch (error) {
-      // Se der erro, não limpa para o usuário tentar de novo
-      console.error(error);
-    } finally {
-      setIsSubmitting(false);
+    // SE DEU CERTO, LIMPA TUDO
+    if (sucesso) {
+      setUmidade("");
+      setForno("");
+      setTipoFarinha("");
+      setPeneira("");
+      setFotoPreview(null);
+      // Incrementa a chave para forçar o input a zerar
+      setResetKey(prev => prev + 1);
     }
   };
 
-  // Função para remover a foto manualmente (botão X)
+  // Botão X para remover foto manualmente
   const removePhoto = () => {
     setFotoPreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    setResetKey(prev => prev + 1);
   };
 
   return (
@@ -181,9 +168,9 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
             
             {!fotoPreview ? (
               <div className="relative group">
-                {/* Input com Referência (Ref) para limpar depois */}
+                {/* O atributo KEY força o React a recriar este input quando o valor muda */}
                 <input
-                  ref={fileInputRef} // <--- Conecta a referência aqui
+                  key={resetKey} 
                   type="file" accept="image/*" capture="environment"
                   onChange={handlePhotoCapture}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
@@ -201,7 +188,7 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
                 <Button
                   type="button" variant="destructive" size="icon"
                   className="absolute top-2 right-2 rounded-full shadow-md w-8 h-8"
-                  onClick={removePhoto} // Usa a função nova de remover
+                  onClick={removePhoto} 
                 >
                   <X className="h-4 w-4" />
                 </Button>
