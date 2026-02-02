@@ -13,7 +13,7 @@ FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
 # Configuração para React Router (SPA) não dar 404
 RUN echo 'server { \
-    listen 80; \
+    listen 3000; \
     location / { \
         root /usr/share/nginx/html; \
         index index.html index.htm; \
