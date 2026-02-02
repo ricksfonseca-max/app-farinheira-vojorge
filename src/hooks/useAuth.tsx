@@ -2,7 +2,7 @@ import { useState, useEffect, createContext, useContext } from "react";
 import { toast } from "@/components/ui/use-toast";
 
 // 🔗 APONTA PARA SEU NODE-RED V3
-const API_URL = "https://nodered-vojorge.fsk.tec.br/api";
+const API_URL = "https://nodered-vojorge.fsk.tec.br";
 
 interface User {
   email: string;
