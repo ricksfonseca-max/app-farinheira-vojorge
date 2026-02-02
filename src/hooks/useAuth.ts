@@ -1,101 +1,109 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, createContext, useContext } from "react";
 import { toast } from "@/components/ui/use-toast";
 
+// 🔗 APONTA PARA SEU NODE-RED V3
+const API_URL = "https://nodered-vojorge.fsk.tec.br/api";
+
 interface User {
-  name: string;
   email: string;
-  token?: string;
+  name: string;
 }
 
-// URL base do Node-RED
-const API_BASE = "https://nodered-vojorge.fsk.tec.br/api/auth";
+interface AuthContextType {
+  user: User | null;
+  loading: boolean;
+  signIn: (email: string, senha: string) => Promise<void>;
+  signUp: (nome: string, email: string, senha: string) => Promise<boolean>;
+  logout: () => void;
+}
 
-export function useAuth() {
+const AuthContext = createContext<AuthContextType>({} as AuthContextType);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Recuperar sessão ao abrir
   useEffect(() => {
-    const savedUser = localStorage.getItem("vj_user_session");
+    // Tenta recuperar o usuário salvo no navegador
+    const savedUser = localStorage.getItem("fsk_user");
     if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch (e) {
-        localStorage.removeItem("vj_user_session");
-      }
+      setUser(JSON.parse(savedUser));
     }
     setLoading(false);
   }, []);
 
-  // LOGIN
+  // --- FUNÇÃO DE LOGIN (ENTRAR) ---
   const signIn = async (email: string, senha: string) => {
-    setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/login`, {
+      const res = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, senha }),
       });
 
-      const data = await response.json();
+      if (!res.ok) throw new Error("Email ou senha incorretos");
 
-      if (!response.ok) throw new Error(data.error || "Erro ao entrar");
-
-      // 1. Salva a sessão
-      localStorage.setItem("vj_user_session", JSON.stringify(data.user));
-      setUser(data.user);
+      const data = await res.json();
+      const userData = data.user;
+      
+      setUser(userData);
+      localStorage.setItem("fsk_user", JSON.stringify(userData));
       
       toast({ 
-        title: `Bem-vindo, ${data.user.name}!`,
+        title: "Acesso Permitido", 
+        description: `Bem-vindo à Fábrica, ${userData.name}.`,
         className: "bg-green-600 text-white border-none"
       });
-
-      // 2. TRUQUE DE MESTRE: Recarrega a página após 1 segundo para entrar no sistema
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-
-    } catch (error: any) {
-      toast({ variant: "destructive", title: "Erro", description: error.message });
-    } finally {
-      setLoading(false);
+      
+    } catch (error) {
+      toast({ 
+        variant: "destructive", 
+        title: "Erro de Acesso", 
+        description: "Verifique suas credenciais." 
+      });
+      throw error;
     }
   };
 
-  // CADASTRO
+  // --- FUNÇÃO DE CADASTRO (CRIAR CONTA) ---
   const signUp = async (nome: string, email: string, senha: string) => {
-    setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/register`, {
+      const res = await fetch(`${API_URL}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nome, email, senha }),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) throw new Error(data.error || "Erro ao cadastrar");
+      if (!res.ok) throw new Error("Erro ao cadastrar");
 
       toast({ 
-        title: "Conta criada com sucesso!", 
-        description: "Faça login para entrar.",
-        className: "bg-green-600 text-white border-none" 
+        title: "Conta Criada!", 
+        description: "Agora faça login com sua nova senha.",
+        className: "bg-blue-600 text-white border-none"
       });
-      
       return true;
-    } catch (error: any) {
-      toast({ variant: "destructive", title: "Erro", description: error.message });
+
+    } catch (error) {
+      toast({ 
+        variant: "destructive", 
+        title: "Erro no Cadastro", 
+        description: "Tente novamente mais tarde." 
+      });
       return false;
-    } finally {
-      setLoading(false);
     }
   };
 
-  const signOut = () => {
-    localStorage.removeItem("vj_user_session");
+  const logout = () => {
     setUser(null);
-    window.location.reload(); // Recarrega ao sair também
+    localStorage.removeItem("fsk_user");
+    toast({ title: "Desconectado", description: "Até logo!" });
   };
 
-  return { user, loading, signIn, signUp, signOut };
+  return (
+    <AuthContext.Provider value={{ user, loading, signIn, signUp, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
+
+export const useAuth = () => useContext(AuthContext);
