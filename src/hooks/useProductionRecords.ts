@@ -3,56 +3,57 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import type { ProductionRecord, ProductionFormData } from "@/types/production";
 
-const API_URL = "https://nodered-vojorge.fsk.tec.br/api/producao"; 
+// 🔗 MESMA URL DO NODE-RED V3
+const API_URL = "https://nodered-vojorge.fsk.tec.br/api/producao";
 
 export function useProductionRecords() {
   const [records, setRecords] = useState<ProductionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
-  // 1. BUSCAR DADOS
+  // --- BUSCAR DADOS (GET) ---
   const fetchRecords = async () => {
     try {
       const response = await fetch(API_URL);
-      if (!response.ok) throw new Error(`Erro HTTP: ${response.status}`);
+      if (!response.ok) throw new Error("Falha na conexão");
       
       const rawData = await response.json();
 
-      // Corrige mapeamento (tipo_farinha -> tipoFarinha)
+      // Mapeia os dados do Postgres (snake_case) para o React (camelCase)
       const formattedData = rawData.map((item: any) => ({
         ...item,
-        tipoFarinha: item.tipo_farinha || item.tipoFarinha || "Não Informado",
-        peneira: item.peneira || "Bica ??"
+        // Garante que o App entenda os campos do banco
+        tipoFarinha: item.tipo_farinha || item.tipoFarinha, 
+        data: item.data_registro || item.data,
+        hora: item.hora_registro || item.hora
       }));
 
       setRecords(formattedData);
     } catch (error) {
-      console.error("Erro Node-RED:", error);
+      console.error("Erro ao buscar:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchRecords();
-    const interval = setInterval(fetchRecords, 15000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // 2. SALVAR (Agora retorna TRUE ou FALSE)
-  const addRecord = async (formData: Omit<ProductionFormData, "usuario">): Promise<boolean> => {
+  // --- SALVAR DADOS (POST) ---
+  const addRecord = async (formData: Omit<ProductionFormData, "usuario">) => {
     if (!user) {
-      toast({ title: "Erro", description: "Usuário desconectado", variant: "destructive" });
+      toast({ title: "Erro", description: "Você precisa estar logado.", variant: "destructive" });
       return false;
     }
 
-    const payload = {
-      ...formData,
-      usuario: user.name,
-      responsavel: user.name
-    };
-
     try {
+      // Monta o pacote para enviar
+      const payload = {
+        ...formData,
+        responsavel: user.name, // Quem está logado
+        usuario: user.name,
+        // Garante data/hora local se não vier do form
+        data: new Date().toISOString().split('T')[0],
+        hora: new Date().toTimeString().split(' ')[0]
+      };
+
       const response = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -61,31 +62,43 @@ export function useProductionRecords() {
 
       if (response.ok) {
         toast({ 
-          title: "Sucesso!", 
-          description: "Registro e foto enviados.",
+          title: "Registro Salvo! 💾", 
+          description: "Dados sincronizados com o Banco Industrial.",
           className: "bg-green-600 text-white border-none"
         });
-        fetchRecords(); // Atualiza a lista
-        return true; // <--- AVISA QUE DEU CERTO
+        fetchRecords(); // Atualiza a tabela na hora
+        return true;
       } else {
-        throw new Error("Erro no servidor");
+        throw new Error("Servidor recusou");
       }
     } catch (error) {
-      toast({ title: "Erro ao Salvar", variant: "destructive" });
-      return false; // <--- AVISA QUE DEU ERRO
+      toast({ title: "Erro ao Salvar", description: "Tente novamente.", variant: "destructive" });
+      return false;
     }
   };
 
-  // 3. DELETAR
+  // --- DELETAR (DELETE) ---
   const deleteRecord = async (id: number) => {
     try {
-      await fetch(`${API_URL}?id=${id}`, { method: "DELETE" });
-      toast({ title: "Apagado." });
-      fetchRecords();
+      await fetch(API_URL, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }) // Envia o ID para deletar
+      });
+      
+      toast({ title: "Apagado", description: "Registro removido." });
+      fetchRecords(); // Atualiza a lista
     } catch (error) {
-      console.error(error);
+      toast({ title: "Erro ao deletar", variant: "destructive" });
     }
   };
 
-  return { records, loading, addRecord, deleteRecord };
+  useEffect(() => {
+    fetchRecords();
+    // Atualiza a cada 15 segundos automaticamente
+    const interval = setInterval(fetchRecords, 15000); 
+    return () => clearInterval(interval);
+  }, []);
+
+  return { records, loading, addRecord, deleteRecord, refresh: fetchRecords };
 }
