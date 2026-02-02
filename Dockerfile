@@ -1,17 +1,17 @@
 # Estágio 1: Build
-FROM node:18-alpine as build
+FROM node:20-alpine as build
 WORKDIR /app
 COPY package*.json ./
-# Instalando com --legacy-peer-deps para evitar conflitos de versão
 RUN npm install --legacy-peer-deps
 COPY . .
-# Rodando a build ignorando erros de tipagem
+# Forçamos a build ignorando erros de tipagem remanescentes
 RUN npx vite build
 
-# Estágio 2: Servidor Web
+# Estágio 2: Runtime
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
-# Configuração para React Router (SPA) não dar 404
+
+# Configura o Nginx para escutar na 3000 e lidar com as rotas do React
 RUN echo 'server { \
     listen 3000; \
     location / { \
@@ -21,5 +21,5 @@ RUN echo 'server { \
     } \
 }' > /etc/nginx/conf.d/default.conf
 
-EXPOSE 80
+EXPOSE 3000
 CMD ["nginx", "-g", "daemon off;"]
