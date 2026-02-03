@@ -3,7 +3,7 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import type { ProductionRecord, ProductionFormData } from "@/types/production";
 
-// ☢️ NOVA ROTA: Isso força o sistema a ignorar qualquer cache antigo
+// ☢️ MUDANÇA CRÍTICA: Rota Nova "Industrial"
 const API_URL = "https://nodered-vojorge.fsk.tec.br/api/industrial";
 
 export function useProductionRecords() {
@@ -14,7 +14,7 @@ export function useProductionRecords() {
   // --- BUSCAR DADOS (GET) ---
   const fetchRecords = async () => {
     try {
-      // ?t=... Truque Anti-Cache
+      // ?t=... Truque para furar o Cache
       const response = await fetch(`${API_URL}?t=${Date.now()}`);
       if (!response.ok) return;
 
@@ -57,6 +57,8 @@ export function useProductionRecords() {
         hora: new Date().toTimeString().split(' ')[0]
       };
 
+      console.log("Enviando para Industrial:", payload);
+
       const response = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -66,11 +68,11 @@ export function useProductionRecords() {
       if (response.ok) {
         toast({ 
           title: "SISTEMA ATUALIZADO 🚀", 
-          description: "Registro salvo na nova rota Industrial.",
+          description: "Dados salvos na nova rota Industrial!",
           className: "bg-green-600 text-white border-none"
         });
         
-        // Atualização forçada dupla
+        // Força atualização 2 vezes para garantir
         setTimeout(() => fetchRecords(), 500); 
         setTimeout(() => fetchRecords(), 1500); 
         return true;
@@ -83,6 +85,7 @@ export function useProductionRecords() {
     }
   };
 
+  // --- DELETAR ---
   const deleteRecord = async (id: number) => {
     await fetch(API_URL, {
         method: "DELETE",
