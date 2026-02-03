@@ -14,7 +14,7 @@ export function useProductionRecords() {
   // --- BUSCAR DADOS (GET) ---
   const fetchRecords = async () => {
     try {
-      // 🚀 TRUQUE ANTI-CACHE: Adicionamos ?t=agora para forçar o navegador a buscar novos dados
+      // 🚀 O SEGREDO: Adicionamos ?t=agora para quebrar o Cache 304
       const response = await fetch(`${API_URL}?t=${Date.now()}`);
       
       if (!response.ok) throw new Error("Falha na conexão");
@@ -26,10 +26,9 @@ export function useProductionRecords() {
         return;
       }
 
-      // Mapeamento Blindado (Trata nulos e undefined)
+      // Mapeamento Blindado (Previne erros se vier nulo do banco)
       const formattedData = rawData.map((item: any) => ({
         id: item.id,
-        // Garante que se o banco mandar snake_case, a gente pega
         tipoFarinha: item.tipo_farinha || item.tipoFarinha || "Padrão", 
         data: item.data_registro || item.data || new Date().toISOString(),
         hora: item.hora_registro || item.hora || "00:00",
@@ -76,7 +75,7 @@ export function useProductionRecords() {
           description: "Registro salvo no banco.",
           className: "bg-green-600 text-white border-none"
         });
-        // Espera 500ms para o banco processar antes de recarregar a lista
+        // Espera um pouquinho pro banco gravar antes de pedir a lista
         setTimeout(fetchRecords, 500); 
         return true;
       } else {
@@ -106,7 +105,6 @@ export function useProductionRecords() {
 
   useEffect(() => {
     fetchRecords();
-    // Atualiza a cada 5 segundos (mais rápido para você ver o resultado)
     const interval = setInterval(fetchRecords, 5000); 
     return () => clearInterval(interval);
   }, []);
