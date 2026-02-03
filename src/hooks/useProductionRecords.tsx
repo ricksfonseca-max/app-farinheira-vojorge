@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import type { ProductionRecord, ProductionFormData } from "@/types/production";
 
 // 🔗 MESMA URL DO NODE-RED V3
-const API_URL = "https://nodered-vojorge.fsk.tec.br";
+const API_URL = "https://nodered-vojorge.fsk.tec.br/api";
 
 export function useProductionRecords() {
   const [records, setRecords] = useState<ProductionRecord[]>([]);
