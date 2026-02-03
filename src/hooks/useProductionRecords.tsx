@@ -3,7 +3,7 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import type { ProductionRecord, ProductionFormData } from "@/types/production";
 
-// 🔗 MESMA URL DO NODE-RED V3
+// 🔗 CORREÇÃO: Aponta direto para a rota de produção
 const API_URL = "https://nodered-vojorge.fsk.tec.br/api/producao";
 
 export function useProductionRecords() {
@@ -19,10 +19,9 @@ export function useProductionRecords() {
       
       const rawData = await response.json();
 
-      // Mapeia os dados do Postgres (snake_case) para o React (camelCase)
+      // Mapeia os campos do banco (snake_case) para o Frontend
       const formattedData = rawData.map((item: any) => ({
         ...item,
-        // Garante que o App entenda os campos do banco
         tipoFarinha: item.tipo_farinha || item.tipoFarinha, 
         data: item.data_registro || item.data,
         hora: item.hora_registro || item.hora
@@ -44,12 +43,10 @@ export function useProductionRecords() {
     }
 
     try {
-      // Monta o pacote para enviar
       const payload = {
         ...formData,
-        responsavel: user.name, // Quem está logado
+        responsavel: user.name,
         usuario: user.name,
-        // Garante data/hora local se não vier do form
         data: new Date().toISOString().split('T')[0],
         hora: new Date().toTimeString().split(' ')[0]
       };
@@ -66,7 +63,7 @@ export function useProductionRecords() {
           description: "Dados sincronizados com o Banco Industrial.",
           className: "bg-green-600 text-white border-none"
         });
-        fetchRecords(); // Atualiza a tabela na hora
+        fetchRecords(); 
         return true;
       } else {
         throw new Error("Servidor recusou");
@@ -83,11 +80,11 @@ export function useProductionRecords() {
       await fetch(API_URL, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }) // Envia o ID para deletar
+        body: JSON.stringify({ id })
       });
       
       toast({ title: "Apagado", description: "Registro removido." });
-      fetchRecords(); // Atualiza a lista
+      fetchRecords(); 
     } catch (error) {
       toast({ title: "Erro ao deletar", variant: "destructive" });
     }
@@ -95,7 +92,6 @@ export function useProductionRecords() {
 
   useEffect(() => {
     fetchRecords();
-    // Atualiza a cada 15 segundos automaticamente
     const interval = setInterval(fetchRecords, 15000); 
     return () => clearInterval(interval);
   }, []);
