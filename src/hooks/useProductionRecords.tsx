@@ -3,7 +3,7 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import type { ProductionRecord, ProductionFormData } from "@/types/production";
 
-// 🔗 CORREÇÃO: Aponta direto para a rota de produção
+// 🔗 URL de Produção
 const API_URL = "https://nodered-vojorge.fsk.tec.br/api/producao";
 
 export function useProductionRecords() {
@@ -14,17 +14,30 @@ export function useProductionRecords() {
   // --- BUSCAR DADOS (GET) ---
   const fetchRecords = async () => {
     try {
-      const response = await fetch(API_URL);
+      // 🚀 TRUQUE ANTI-CACHE: Adicionamos ?t=agora para forçar o navegador a buscar novos dados
+      const response = await fetch(`${API_URL}?t=${Date.now()}`);
+      
       if (!response.ok) throw new Error("Falha na conexão");
       
       const rawData = await response.json();
 
-      // Mapeia os campos do banco (snake_case) para o Frontend
+      if (!Array.isArray(rawData)) {
+        console.error("Recebido algo que não é lista:", rawData);
+        return;
+      }
+
+      // Mapeamento Blindado (Trata nulos e undefined)
       const formattedData = rawData.map((item: any) => ({
-        ...item,
-        tipoFarinha: item.tipo_farinha || item.tipoFarinha, 
-        data: item.data_registro || item.data,
-        hora: item.hora_registro || item.hora
+        id: item.id,
+        // Garante que se o banco mandar snake_case, a gente pega
+        tipoFarinha: item.tipo_farinha || item.tipoFarinha || "Padrão", 
+        data: item.data_registro || item.data || new Date().toISOString(),
+        hora: item.hora_registro || item.hora || "00:00",
+        umidade: Number(item.umidade || 0),
+        forno: item.forno || "Geral",
+        peneira: item.peneira || "Bica 1",
+        responsavel: item.responsavel || "Sistema",
+        foto: item.foto || null
       }));
 
       setRecords(formattedData);
@@ -59,17 +72,18 @@ export function useProductionRecords() {
 
       if (response.ok) {
         toast({ 
-          title: "Registro Salvo! 💾", 
-          description: "Dados sincronizados com o Banco Industrial.",
+          title: "Sucesso! 💾", 
+          description: "Registro salvo no banco.",
           className: "bg-green-600 text-white border-none"
         });
-        fetchRecords(); 
+        // Espera 500ms para o banco processar antes de recarregar a lista
+        setTimeout(fetchRecords, 500); 
         return true;
       } else {
         throw new Error("Servidor recusou");
       }
     } catch (error) {
-      toast({ title: "Erro ao Salvar", description: "Tente novamente.", variant: "destructive" });
+      toast({ title: "Erro ao Salvar", variant: "destructive" });
       return false;
     }
   };
@@ -84,7 +98,7 @@ export function useProductionRecords() {
       });
       
       toast({ title: "Apagado", description: "Registro removido." });
-      fetchRecords(); 
+      setTimeout(fetchRecords, 500);
     } catch (error) {
       toast({ title: "Erro ao deletar", variant: "destructive" });
     }
@@ -92,7 +106,8 @@ export function useProductionRecords() {
 
   useEffect(() => {
     fetchRecords();
-    const interval = setInterval(fetchRecords, 15000); 
+    // Atualiza a cada 5 segundos (mais rápido para você ver o resultado)
+    const interval = setInterval(fetchRecords, 5000); 
     return () => clearInterval(interval);
   }, []);
 
