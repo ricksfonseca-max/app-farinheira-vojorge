@@ -9,7 +9,9 @@ import { Header } from "@/components/Header";
 import { Loader2, ListChecks, BarChart3, LayoutDashboard } from "lucide-react";
 
 export default function Index() {
-  const { user, loading: authLoading, signOut } = useAuth();
+  // 🐛 CORREÇÃO AQUI: Mudamos de 'signOut' para 'logout'
+  const { user, loading: authLoading, logout } = useAuth();
+  
   const { records, loading: recordsLoading, addRecord, deleteRecord } = useProductionRecords();
   
   const [activeTab, setActiveTab] = useState<'registros' | 'graficos'>('registros');
@@ -26,7 +28,8 @@ export default function Index() {
 
   return (
     <div className="min-h-screen bg-slate-100 pb-10">
-      <Header user={user} onLogout={signOut} />
+      {/* Agora passamos a função 'logout' correta para o Header */}
+      <Header user={user} onLogout={logout} />
       
       {/* CONTAINER LARGURA TOTAL (Max-w-7xl preenche quase tudo) */}
       <main className="container mx-auto px-4 py-6 max-w-[95%]">
