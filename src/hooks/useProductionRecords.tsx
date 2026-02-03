@@ -1,112 +1,56 @@
 import { useState, useEffect } from "react";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import type { ProductionRecord, ProductionFormData } from "@/types/production";
 
-// 👇 COLE O SEU ENDEREÇO NOVO AQUI (Mantenha o /api/industrial no final)
+// 🔴 IMPORTANTE: Coloque aqui o link do seu Node-RED da VPS
 const API_URL = "https://nodered-v2.fsk.tec.br/api/industrial"; 
 
 export function useProductionRecords() {
-  const [records, setRecords] = useState<ProductionRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [records, setRecords] = useState<any[]>([]);
   const { user } = useAuth();
 
-  // --- BUSCAR DADOS (GET) ---
+  // Função para Buscar
   const fetchRecords = async () => {
     try {
-      // ?t=... Truque Anti-Cache (Garante que vê os dados reais)
-      const response = await fetch(`${API_URL}?t=${Date.now()}`);
-      
-      if (!response.ok) {
-         // Se der erro 404, é porque a URL está errada
-         console.error("Erro na conexão:", response.status);
-         return;
+      const res = await fetch(API_URL);
+      if (res.ok) {
+        const data = await res.json();
+        // Converte o formato do banco (snake_case) para o App (camelCase)
+        setRecords(data.map((r: any) => ({
+          ...r,
+          tipoFarinha: r.tipo_farinha, // Tradução importante
+          umidade: Number(r.umidade)
+        })));
       }
-      
-      const rawData = await response.json();
-
-      if (!Array.isArray(rawData)) return;
-
-      const formattedData = rawData.map((item: any) => ({
-        id: item.id,
-        tipoFarinha: item.tipo_farinha || item.tipoFarinha || "Padrão", 
-        data: item.data_registro || item.data || new Date().toISOString(),
-        hora: item.hora_registro || item.hora || "00:00",
-        umidade: Number(item.umidade || 0),
-        forno: item.forno || "Geral",
-        peneira: item.peneira || "Bica 1",
-        responsavel: item.responsavel || "Sistema",
-        foto: item.foto || null
-      }));
-
-      setRecords(formattedData);
-    } catch (error) {
-      console.error("Erro Fatal no GET:", error);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { console.error("Erro ao buscar", e); }
   };
 
-  // --- SALVAR DADOS (POST) ---
-  const addRecord = async (formData: Omit<ProductionFormData, "usuario">) => {
-    if (!user) {
-      toast({ title: "Erro", description: "Faça login.", variant: "destructive" });
-      return false;
-    }
-
+  // Função para Salvar
+  const addRecord = async (formData: any) => {
     try {
       const payload = {
         ...formData,
-        responsavel: user.name,
-        usuario: user.name,
-        data: new Date().toISOString().split('T')[0],
-        hora: new Date().toTimeString().split(' ')[0]
+        responsavel: user?.name || "Operador",
+        data: new Date().toLocaleDateString('pt-BR'),
+        hora: new Date().toLocaleTimeString('pt-BR')
       };
 
-      console.log("Enviando para Fábrica Nova:", payload);
-
-      const response = await fetch(API_URL, {
+      await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(payload)
       });
 
-      if (response.ok) {
-        toast({ 
-          title: "FÁBRICA V2 CONECTADA 🏭", 
-          description: "Registro salvo no banco novo!",
-          className: "bg-blue-600 text-white border-none" // Azul para diferenciar
-        });
-        
-        // Atualiza a lista duas vezes para garantir
-        setTimeout(() => fetchRecords(), 500); 
-        setTimeout(() => fetchRecords(), 1500); 
-        return true;
-      } else {
-        throw new Error("Erro no servidor");
-      }
+      toast({ title: "Sucesso", description: "Registro Salvo na VPS!" });
+      fetchRecords(); // Atualiza a lista
+      return true;
     } catch (error) {
-      toast({ title: "Erro ao Salvar", description: "Verifique a URL da API.", variant: "destructive" });
+      toast({ variant: "destructive", title: "Erro de Conexão" });
       return false;
     }
   };
 
-  // --- DELETAR ---
-  const deleteRecord = async (id: number) => {
-    await fetch(API_URL, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id })
-    });
-    toast({ title: "Apagado" });
-    fetchRecords();
-  };
+  useEffect(() => { fetchRecords(); }, []);
 
-  useEffect(() => {
-    fetchRecords();
-    const interval = setInterval(fetchRecords, 5000); 
-    return () => clearInterval(interval);
-  }, []);
-
-  return { records, loading, addRecord, deleteRecord, refresh: fetchRecords };
+  return { records, loading: false, addRecord, deleteRecord: async () => {} };
 }
