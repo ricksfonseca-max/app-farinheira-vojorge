@@ -1,8 +1,8 @@
 import { useState, useEffect, createContext, useContext } from "react";
 import { toast } from "@/components/ui/use-toast";
 
-// 🔗 CORREÇÃO: Adicionado /api no final
-const API_URL = "https://nodered-vojorge.fsk.tec.br/api";
+// 🔗 CORREÇÃO FINAL: Aponta para o servidor NOVO (V2)
+const API_URL = "https://nodered-v2.fsk.tec.br/api";
 
 interface User {
   email: string;
@@ -34,7 +34,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // --- LOGIN ---
   const signIn = async (email: string, senha: string) => {
     try {
-      // Agora bate em /api/auth/login
       const res = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -44,14 +43,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!res.ok) throw new Error("Email ou senha incorretos");
 
       const data = await res.json();
-      const userData = data.user;
+      // O backend pode retornar { user: ... } ou direto o objeto
+      const userData = data.user || data; 
       
       setUser(userData);
       localStorage.setItem("fsk_user", JSON.stringify(userData));
       
       toast({ 
-        title: "Acesso Permitido", 
-        description: `Bem-vindo à Fábrica, ${userData.name}.`,
+        title: "Acesso Permitido 🔓", 
+        description: `Bem-vindo à Fábrica V2, ${userData.name || 'Operador'}.`,
         className: "bg-green-600 text-white border-none"
       });
       
