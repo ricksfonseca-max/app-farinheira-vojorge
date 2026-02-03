@@ -14,22 +14,26 @@ export function useProductionRecords() {
   // --- BUSCAR DADOS (GET) ---
   const fetchRecords = async () => {
     try {
-      // 🚀 SEGREDO: ?t=agora obriga o navegador a baixar a lista nova (Sem Cache)
-      const response = await fetch(`${API_URL}?t=${Date.now()}`);
+      const timeStamp = Date.now();
+      // ?t=... obriga o navegador a não usar cache
+      const response = await fetch(`${API_URL}?t=${timeStamp}`);
       
-      if (!response.ok) throw new Error("Falha na conexão");
+      if (!response.ok) {
+        console.error(`Erro GET: ${response.status} - ${response.statusText}`);
+        return;
+      }
       
       const rawData = await response.json();
 
       if (!Array.isArray(rawData)) {
-        console.error("Recebido algo que não é lista:", rawData);
+        // Se vier { error: ... } mostra no console
+        console.error("GET retornou erro ou formato inválido:", rawData);
         return;
       }
 
-      // Mapeamento Blindado (Converte o que vem do Banco para o App)
       const formattedData = rawData.map((item: any) => ({
         id: item.id,
-        tipoFarinha: item.tipo_farinha || item.tipoFarinha || "Não informado", 
+        tipoFarinha: item.tipo_farinha || item.tipoFarinha || "Padrão", 
         data: item.data_registro || item.data || new Date().toISOString(),
         hora: item.hora_registro || item.hora || "00:00",
         umidade: Number(item.umidade || 0),
@@ -39,9 +43,10 @@ export function useProductionRecords() {
         foto: item.foto || null
       }));
 
+      // Só atualiza se tiver dados diferentes (evita piscar a tela)
       setRecords(formattedData);
     } catch (error) {
-      console.error("Erro ao buscar:", error);
+      console.error("Erro Fatal no GET:", error);
     } finally {
       setLoading(false);
     }
@@ -50,11 +55,12 @@ export function useProductionRecords() {
   // --- SALVAR DADOS (POST) ---
   const addRecord = async (formData: Omit<ProductionFormData, "usuario">) => {
     if (!user) {
-      toast({ title: "Erro", description: "Você precisa estar logado.", variant: "destructive" });
+      toast({ title: "Erro de Permissão", description: "Faça login novamente.", variant: "destructive" });
       return false;
     }
 
     try {
+      // Prepara o pacote
       const payload = {
         ...formData,
         responsavel: user.name,
@@ -62,6 +68,8 @@ export function useProductionRecords() {
         data: new Date().toISOString().split('T')[0],
         hora: new Date().toTimeString().split(' ')[0]
       };
+
+      console.log("Enviando POST:", payload); // DEBUG
 
       const response = await fetch(API_URL, {
         method: "POST",
@@ -71,19 +79,28 @@ export function useProductionRecords() {
 
       if (response.ok) {
         toast({ 
-          title: "Sucesso! 💾", 
+          title: "Sucesso! (v3) 🚀", 
           description: "Registro salvo no banco.",
           className: "bg-green-600 text-white border-none"
         });
         
-        // Espera 1 segundo e recarrega a lista à força
-        setTimeout(() => fetchRecords(), 1000); 
+        // Estratégia de Atualização Dupla (Garante que a lista atualize)
+        setTimeout(() => fetchRecords(), 500); 
+        setTimeout(() => fetchRecords(), 2000); 
         return true;
       } else {
-        throw new Error("Servidor recusou");
+        // Tenta ler o erro que o servidor mandou
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Erro POST:", response.status, errorData);
+        throw new Error(errorData.error || "Servidor recusou a gravação");
       }
-    } catch (error) {
-      toast({ title: "Erro ao Salvar", variant: "destructive" });
+    } catch (error: any) {
+      console.error("Erro no addRecord:", error);
+      toast({ 
+        title: "Falha ao Salvar", 
+        description: error.message || "Verifique sua conexão.", 
+        variant: "destructive" 
+      });
       return false;
     }
   };
@@ -106,7 +123,6 @@ export function useProductionRecords() {
 
   useEffect(() => {
     fetchRecords();
-    // Atualiza automaticamente a cada 5 segundos
     const interval = setInterval(fetchRecords, 5000); 
     return () => clearInterval(interval);
   }, []);
