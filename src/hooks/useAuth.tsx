@@ -1,109 +1,20 @@
-import { useState, useEffect, createContext, useContext } from "react";
-import { toast } from "@/components/ui/use-toast";
+import { useState, createContext, useContext, ReactNode } from "react";
 
-// 🔗 CORREÇÃO FINAL: Aponta para o servidor NOVO (V2)
-const API_URL = "https://nodered-v2.fsk.tec.br/api";
+const AuthContext = createContext({
+  user: { id: "1", name: "Operador VPS", email: "op@industria.com" },
+  loading: false,
+  signIn: async () => {},
+  signOut: async () => {}
+});
 
-interface User {
-  email: string;
-  name: string;
-}
-
-interface AuthContextType {
-  user: User | null;
-  loading: boolean;
-  signIn: (email: string, senha: string) => Promise<void>;
-  signUp: (nome: string, email: string, senha: string) => Promise<boolean>;
-  logout: () => void;
-}
-
-const AuthContext = createContext<AuthContextType>({} as AuthContextType);
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const savedUser = localStorage.getItem("fsk_user");
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    setLoading(false);
-  }, []);
-
-  // --- LOGIN ---
-  const signIn = async (email: string, senha: string) => {
-    try {
-      const res = await fetch(`${API_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, senha }),
-      });
-
-      if (!res.ok) throw new Error("Email ou senha incorretos");
-
-      const data = await res.json();
-      // O backend pode retornar { user: ... } ou direto o objeto
-      const userData = data.user || data; 
-      
-      setUser(userData);
-      localStorage.setItem("fsk_user", JSON.stringify(userData));
-      
-      toast({ 
-        title: "Acesso Permitido 🔓", 
-        description: `Bem-vindo à Fábrica V2, ${userData.name || 'Operador'}.`,
-        className: "bg-green-600 text-white border-none"
-      });
-      
-    } catch (error) {
-      toast({ 
-        variant: "destructive", 
-        title: "Erro de Acesso", 
-        description: "Verifique suas credenciais." 
-      });
-      throw error;
-    }
-  };
-
-  // --- CADASTRO ---
-  const signUp = async (nome: string, email: string, senha: string) => {
-    try {
-      const res = await fetch(`${API_URL}/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nome, email, senha }),
-      });
-
-      if (!res.ok) throw new Error("Erro ao cadastrar");
-
-      toast({ 
-        title: "Conta Criada!", 
-        description: "Agora faça login com sua nova senha.",
-        className: "bg-blue-600 text-white border-none"
-      });
-      return true;
-
-    } catch (error) {
-      toast({ 
-        variant: "destructive", 
-        title: "Erro no Cadastro", 
-        description: "Tente novamente mais tarde." 
-      });
-      return false;
-    }
-  };
-
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem("fsk_user");
-    toast({ title: "Desconectado", description: "Até logo!" });
-  };
-
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  // Simula um usuário já logado
+  const user = { id: "1", name: "Operador VPS", email: "op@industria.com" };
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, logout }}>
+    <AuthContext.Provider value={{ user, loading: false, signIn: async()=>{}, signOut: async()=>{} }}>
       {children}
     </AuthContext.Provider>
   );
-}
+};
 
 export const useAuth = () => useContext(AuthContext);
