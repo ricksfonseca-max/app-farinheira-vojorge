@@ -3,7 +3,7 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import type { ProductionRecord, ProductionFormData } from "@/types/production";
 
-// ☢️ MUDANÇA CRÍTICA: Rota Nova "Industrial"
+// ☢️ IMPORTANTE: Mudamos a rota para 'industrial' para evitar cache
 const API_URL = "https://nodered-vojorge.fsk.tec.br/api/industrial";
 
 export function useProductionRecords() {
@@ -14,10 +14,11 @@ export function useProductionRecords() {
   // --- BUSCAR DADOS (GET) ---
   const fetchRecords = async () => {
     try {
-      // ?t=... Truque para furar o Cache
+      // ?t=... Truque para o navegador não usar a memória antiga
       const response = await fetch(`${API_URL}?t=${Date.now()}`);
+      
       if (!response.ok) return;
-
+      
       const rawData = await response.json();
       if (!Array.isArray(rawData)) return;
 
@@ -57,7 +58,7 @@ export function useProductionRecords() {
         hora: new Date().toTimeString().split(' ')[0]
       };
 
-      console.log("Enviando para Industrial:", payload);
+      console.log("Enviando POST para Industrial:", payload);
 
       const response = await fetch(API_URL, {
         method: "POST",
@@ -72,7 +73,7 @@ export function useProductionRecords() {
           className: "bg-green-600 text-white border-none"
         });
         
-        // Força atualização 2 vezes para garantir
+        // Atualiza a lista duas vezes
         setTimeout(() => fetchRecords(), 500); 
         setTimeout(() => fetchRecords(), 1500); 
         return true;
