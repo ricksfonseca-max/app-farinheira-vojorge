@@ -1,7 +1,7 @@
 import { useState, useEffect, createContext, useContext } from "react";
 import { toast } from "@/components/ui/use-toast";
 
-// 🔗 APONTA PARA SEU NODE-RED V3
+// 🔗 CORREÇÃO: Adicionado /api no final
 const API_URL = "https://nodered-vojorge.fsk.tec.br/api";
 
 interface User {
@@ -24,7 +24,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Tenta recuperar o usuário salvo no navegador
     const savedUser = localStorage.getItem("fsk_user");
     if (savedUser) {
       setUser(JSON.parse(savedUser));
@@ -32,9 +31,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
   }, []);
 
-  // --- FUNÇÃO DE LOGIN (ENTRAR) ---
+  // --- LOGIN ---
   const signIn = async (email: string, senha: string) => {
     try {
+      // Agora bate em /api/auth/login
       const res = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // --- FUNÇÃO DE CADASTRO (CRIAR CONTA) ---
+  // --- CADASTRO ---
   const signUp = async (nome: string, email: string, senha: string) => {
     try {
       const res = await fetch(`${API_URL}/auth/register`, {
