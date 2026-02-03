@@ -1,20 +1,45 @@
-import { useState, createContext, useContext, ReactNode } from "react";
+import { useState, createContext, useContext, ReactNode, useEffect } from "react";
 
-const AuthContext = createContext({
-  user: { id: "1", name: "Operador VPS", email: "op@industria.com" },
+// Definição do Tipo de Usuário Simulado
+interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+
+const AuthContext = createContext<{
+  user: User | null;
+  loading: boolean;
+  signIn: () => Promise<void>;
+  signOut: () => Promise<void>;
+}>({
+  user: null,
   loading: false,
   signIn: async () => {},
-  signOut: async () => {}
+  signOut: async () => {},
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  // Simula um usuário já logado
-  const user = { id: "1", name: "Operador VPS", email: "op@industria.com" };
+  // ✅ O TRUQUE: Já iniciamos com o usuário preenchido!
+  // O App vai achar que você acabou de digitar a senha correta.
+  const [user, setUser] = useState<User | null>({
+    id: "operador-01",
+    name: "Operador da Fábrica",
+    email: "producao@farinheira.com"
+  });
+
   return (
-    <AuthContext.Provider value={{ user, loading: false, signIn: async()=>{}, signOut: async()=>{} }}>
+    <AuthContext.Provider value={{ 
+        user, 
+        loading: false, 
+        signIn: async () => {}, // Funções vazias para não dar erro
+        signOut: async () => {} 
+    }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  return useContext(AuthContext);
+};
