@@ -14,7 +14,7 @@ export function useProductionRecords() {
   // --- BUSCAR DADOS (GET) ---
   const fetchRecords = async () => {
     try {
-      // 🚀 SEGREDO: ?t=agora quebra o cache e atualiza a lista na hora
+      // 🚀 SEGREDO: ?t=agora obriga o navegador a baixar a lista nova (Sem Cache)
       const response = await fetch(`${API_URL}?t=${Date.now()}`);
       
       if (!response.ok) throw new Error("Falha na conexão");
@@ -26,7 +26,7 @@ export function useProductionRecords() {
         return;
       }
 
-      // Mapeamento Seguro
+      // Mapeamento Blindado (Converte o que vem do Banco para o App)
       const formattedData = rawData.map((item: any) => ({
         id: item.id,
         tipoFarinha: item.tipo_farinha || item.tipoFarinha || "Não informado", 
@@ -76,6 +76,7 @@ export function useProductionRecords() {
           className: "bg-green-600 text-white border-none"
         });
         
+        // Espera 1 segundo e recarrega a lista à força
         setTimeout(() => fetchRecords(), 1000); 
         return true;
       } else {
@@ -105,6 +106,7 @@ export function useProductionRecords() {
 
   useEffect(() => {
     fetchRecords();
+    // Atualiza automaticamente a cada 5 segundos
     const interval = setInterval(fetchRecords, 5000); 
     return () => clearInterval(interval);
   }, []);
