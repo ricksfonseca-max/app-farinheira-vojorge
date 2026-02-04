@@ -5,11 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { CheckCircle2, Camera, X, Loader2, Flame, Wheat, Droplets } from "lucide-react";
-import { toast } from "@/components/ui/use-toast";
-import { api } from "@/services/api"; // <--- IMPORTA A NOSSA API NOVA
+import { toast } from "@/hooks/use-toast"; // Verifica se o path do hook está correto no teu projeto
+import { api } from "@/services/api";
 
 interface ProductionFormProps {
-  onSubmit: (data: any) => Promise<boolean>; // Mantemos a assinatura mas não usamos o retorno no pai obrigatóriamente
+  onSubmit: () => void; // Callback para atualizar a tabela após salvar
 }
 
 export function ProductionForm({ onSubmit }: ProductionFormProps) {
@@ -17,11 +17,12 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
   const [forno, setForno] = useState("");
   const [tipoFarinha, setTipoFarinha] = useState("");
   const [peneira, setPeneira] = useState("");
+  
   const [fotoArquivo, setFotoArquivo] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Helper: Converte Arquivo -> Base64 (Texto)
+  // Função auxiliar: Arquivo -> Base64
   const toBase64 = (file: File) => new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -39,47 +40,52 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!umidade || !forno || !tipoFarinha || !peneira) {
-      toast({ variant: "destructive", title: "Preencha todos os campos!" });
+      toast({ variant: "destructive", title: "Erro", description: "Preencha todos os campos obrigatórios." });
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      // 1. Converter Foto se existir
-      let fotoBase64 = "";
+      let fotoString = "";
       if (fotoArquivo) {
-        fotoBase64 = await toBase64(fotoArquivo);
+        fotoString = await toBase64(fotoArquivo);
       }
 
-      // 2. Montar Objeto
+      // Mapeamento dos campos para o formato que o Node-RED espera
       const payload = {
         umidade: parseFloat(umidade),
         forno,
-        tipo_farinha: tipoFarinha,
+        tipo_farinha: tipoFarinha, // Snake_case no banco? O Node-RED resolve.
         peneira,
-        foto: fotoBase64,
-        responsavel: "Operador Mobile" // Depois pegamos do login real
+        responsavel: "Operador App", // Podes pegar do contexto de auth depois
+        foto: fotoString
       };
 
-      // 3. Enviar para Node-RED -> MySQL
       const sucesso = await api.salvar(payload);
 
       if (sucesso) {
-        toast({ title: "Salvo com sucesso!", className: "bg-green-600 text-white" });
-        // Limpar tudo
-        setUmidade(""); setForno(""); setTipoFarinha(""); setPeneira("");
-        setFotoArquivo(null); setFotoPreview(null);
+        toast({ title: "Sucesso!", description: "Produção registrada no sistema." });
         
-        // Avisar o pai para atualizar lista (opcional)
-        onSubmit(payload); 
+        // Limpar formulário
+        setUmidade("");
+        setForno("");
+        setTipoFarinha("");
+        setPeneira("");
+        setFotoArquivo(null);
+        setFotoPreview(null);
+        
+        // Atualizar lista
+        onSubmit();
       } else {
-        throw new Error("Falha na API");
+        throw new Error("API retornou erro");
       }
 
     } catch (error) {
-      toast({ variant: "destructive", title: "Erro de conexão", description: "Verifique se o Node-RED está online." });
+      console.error(error);
+      toast({ variant: "destructive", title: "Erro de Conexão", description: "Verifique se o servidor está online." });
     } finally {
       setIsSubmitting(false);
     }
@@ -90,27 +96,25 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
       <CardHeader className="pb-4 border-b border-slate-100">
         <CardTitle className="text-xl flex items-center gap-2 text-slate-800">
           <CheckCircle2 className="h-6 w-6 text-green-600" />
-          Registro de Produção
+          Novo Registro
         </CardTitle>
       </CardHeader>
       
       <CardContent className="pt-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           
-          {/* CAMPO UMIDADE */}
           <div className="space-y-2 text-center">
-            <label className="text-sm font-bold text-slate-500 uppercase tracking-wider">Umidade (%)</label>
+            <label className="text-sm font-bold text-slate-500 uppercase">Umidade (%)</label>
             <Input 
               type="number" step="0.1" placeholder="0.0"
               value={umidade} onChange={(e) => setUmidade(e.target.value)}
-              className="text-5xl py-8 h-auto text-center font-bold tracking-tighter bg-slate-50 border-slate-200 focus:border-green-500 text-slate-800 rounded-xl"
+              className="text-5xl py-8 h-auto text-center font-bold bg-slate-50 border-slate-200 text-slate-800 rounded-xl"
               required
             />
           </div>
 
-          {/* MENUS (Mantive simplificado para caber aqui) */}
           <Accordion type="single" collapsible className="w-full space-y-3">
-             <AccordionItem value="forno" className="border rounded-lg bg-orange-50">
+            <AccordionItem value="forno" className="border rounded-lg bg-orange-50">
               <AccordionTrigger className="px-4 font-bold text-orange-800"><div className="flex gap-2"><Flame className="w-5 h-5"/> Forno {forno}</div></AccordionTrigger>
               <AccordionContent className="px-4 pb-4">
                 <Select value={forno} onValueChange={setForno}>
@@ -124,7 +128,7 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
             </AccordionItem>
 
             <AccordionItem value="tipo" className="border rounded-lg bg-stone-100">
-              <AccordionTrigger className="px-4 font-bold text-stone-800"><div className="flex gap-2"><Wheat className="w-5 h-5"/> Farinha {tipoFarinha}</div></AccordionTrigger>
+              <AccordionTrigger className="px-4 font-bold text-stone-800"><div className="flex gap-2"><Wheat className="w-5 h-5"/> Tipo {tipoFarinha}</div></AccordionTrigger>
               <AccordionContent className="px-4 pb-4">
                 <Select value={tipoFarinha} onValueChange={setTipoFarinha}>
                   <SelectTrigger className="bg-white"><SelectValue placeholder="Selecione" /></SelectTrigger>
@@ -150,7 +154,6 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
             </AccordionItem>
           </Accordion>
 
-          {/* FOTO */}
           <div className="space-y-2 pt-2 border-t border-slate-100 mt-4">
             {!fotoPreview ? (
               <div className="relative">
