@@ -1,147 +1,110 @@
-import { useState } from "react";
-import { 
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Trash2, Eye, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import type { ProductionRecord } from "@/types/production";
+import { Button } from "@/components/ui/button";
+import { Trash2, Image as ImageIcon } from "lucide-react";
+import { format } from "date-fns";
+// import { ptBR } from "date-fns/locale"; // Opcional para português
+
+interface Record {
+  id?: number;
+  data_hora?: string; // Pode vir do banco como string ISO
+  umidade: number;
+  forno: string;
+  tipo_farinha: string;
+  peneira: string;
+  responsavel: string;
+  foto?: string;
+}
 
 interface ProductionTableProps {
-  records: ProductionRecord[];
-  onDelete: (id: number) => void;
+  records: Record[];
+  onDelete?: (id: number) => void;
 }
 
 export function ProductionTable({ records, onDelete }: ProductionTableProps) {
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-
-  // --- CORREÇÃO DA DATA (INVALID DATE) ---
-  const formatDate = (dateString: string, timeString: string) => {
-    if (!dateString) return "-";
+  
+  // Função segura para formatar data
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "Agora"; // Se não tiver data (ex: acabou de salvar), mostra "Agora"
     try {
-      // Pega só a parte da data "2026-01-21" e ignora o resto (T00:00...)
-      const cleanDate = dateString.toString().substring(0, 10);
-      const cleanTime = timeString ? timeString.toString() : "00:00";
-      
-      // Cria a data manualmente para não depender do navegador
-      const [year, month, day] = cleanDate.split('-').map(Number);
-      const [hour, minute] = cleanTime.split(':').map(Number);
-      
-      const date = new Date(year, month - 1, day, hour, minute);
-      
-      return date.toLocaleString('pt-BR', { 
-        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' 
-      });
-    } catch (e) {
-      return `${dateString.substring(0,10)} ${timeString}`; // Fallback simples
+      return new Date(dateString).toLocaleString("pt-BR");
+    } catch {
+      return dateString;
     }
   };
 
   return (
-    <>
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-slate-50 hover:bg-slate-50">
+            <TableHead className="w-[180px]">Data / Hora</TableHead>
+            <TableHead>Umidade</TableHead>
+            <TableHead>Forno</TableHead>
+            <TableHead>Tipo</TableHead>
+            <TableHead>Peneira</TableHead>
+            <TableHead className="text-right">Foto</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {records.length === 0 ? (
             <TableRow>
-              <TableHead className="w-[140px]">Data / Hora</TableHead>
-              <TableHead className="text-center">Umidade</TableHead>
-              <TableHead>Forno</TableHead>
-              {/* TÍTULO CORRIGIDO PARA COMBINAR COM O FORMULÁRIO */}
-              <TableHead>Tipo de Farinha</TableHead>
-              <TableHead>Bica</TableHead>
-              <TableHead className="text-center">Evidência</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
+              <TableCell colSpan={6} className="text-center py-8 text-slate-400">
+                Nenhum registro encontrado.
+              </TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {records.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-slate-400">
-                  Nenhum registro encontrado hoje.
+          ) : (
+            records.map((record, index) => (
+              <TableRow key={record.id || index} className="hover:bg-slate-50/50">
+                <TableCell className="font-medium text-slate-600">
+                  {formatDate(record.data_hora)}
+                </TableCell>
+                
+                <TableCell>
+                  <Badge 
+                    variant={record.umidade > 14 || record.umidade < 10 ? "destructive" : "secondary"}
+                    className={
+                        record.umidade >= 10 && record.umidade <= 14 
+                        ? "bg-green-100 text-green-700 hover:bg-green-200" 
+                        : ""
+                    }
+                  >
+                    {record.umidade.toFixed(1)}%
+                  </Badge>
+                </TableCell>
+                
+                <TableCell>{record.forno}</TableCell>
+                <TableCell>{record.tipo_farinha}</TableCell>
+                <TableCell>{record.peneira}</TableCell>
+                
+                <TableCell className="text-right">
+                  {record.foto ? (
+                    <div className="flex justify-end gap-2">
+                       {/* Miniatura da Foto (Base64) */}
+                       <div className="relative group w-10 h-10 overflow-hidden rounded-md border border-slate-200 cursor-pointer hover:scale-150 transition-transform origin-right z-10 bg-white">
+                          <img 
+                            src={record.foto.startsWith('data:') ? record.foto : `data:image/jpeg;base64,${record.foto}`} 
+                            alt="Amostra" 
+                            className="w-full h-full object-cover"
+                          />
+                       </div>
+                    </div>
+                  ) : (
+                    <span className="text-slate-300 text-xs"><ImageIcon className="w-4 h-4 ml-auto"/></span>
+                  )}
                 </TableCell>
               </TableRow>
-            ) : (
-              records.map((rec) => (
-                <TableRow key={rec.id} className="hover:bg-slate-50 transition-colors">
-                  
-                  {/* Data Corrigida */}
-                  <TableCell className="font-medium text-xs text-slate-500">
-                    {formatDate(rec.data, rec.hora)}
-                    <div className="text-[10px] text-slate-400 uppercase">{rec.responsavel}</div>
-                  </TableCell>
-
-                  <TableCell className="text-center">
-                    <span className={`font-bold px-2 py-1 rounded ${
-                      rec.umidade >= 13.5 ? "bg-red-100 text-red-700" :
-                      rec.umidade <= 11.5 ? "bg-yellow-100 text-yellow-700" :
-                      "bg-green-100 text-green-700"
-                    }`}>
-                      {Number(rec.umidade).toFixed(1)}%
-                    </span>
-                  </TableCell>
-
-                  <TableCell className="text-xs">{rec.forno}</TableCell>
-
-                  {/* Tipo de Farinha (Agora puxando certo do Hook) */}
-                  <TableCell>
-                    <Badge variant="outline" className="text-slate-600 border-slate-300 font-normal">
-                      {rec.tipoFarinha}
-                    </Badge>
-                  </TableCell>
-
-                  <TableCell className="text-xs text-slate-600">
-                    {rec.peneira}
-                  </TableCell>
-
-                  <TableCell className="text-center">
-                    {rec.foto && rec.foto.length > 50 ? (
-                      <Button 
-                        variant="ghost" size="sm" 
-                        className="text-blue-600 hover:bg-blue-50"
-                        onClick={() => setSelectedImage(rec.foto!)}
-                      >
-                        <Eye className="h-4 w-4 mr-1" /> Ver
-                      </Button>
-                    ) : (
-                      <span className="text-slate-300 text-xs">-</span>
-                    )}
-                  </TableCell>
-
-                  <TableCell className="text-right">
-                    <Button 
-                      variant="ghost" size="icon" 
-                      onClick={() => onDelete(rec.id)}
-                      className="text-slate-400 hover:text-red-600"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Modal de Zoom */}
-      {selectedImage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="relative bg-white p-2 rounded-lg shadow-2xl max-w-3xl max-h-[90vh] flex flex-col">
-            <Button 
-              variant="destructive" size="icon" 
-              className="absolute -top-4 -right-4 rounded-full shadow-md z-10"
-              onClick={() => setSelectedImage(null)}
-            >
-              <X className="h-5 w-5" />
-            </Button>
-            <div className="overflow-auto rounded-md">
-              <img src={selectedImage} alt="Evidência" className="w-full h-auto object-contain max-h-[80vh]" />
-            </div>
-            <p className="text-center text-xs text-slate-400 mt-2 font-mono">Evidência visual</p>
-          </div>
-          <div className="absolute inset-0 -z-10" onClick={() => setSelectedImage(null)}></div>
-        </div>
-      )}
-    </>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
