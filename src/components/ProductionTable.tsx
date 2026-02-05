@@ -8,8 +8,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"; // <--- NOVOS IMPORTS
-import { Image as ImageIcon, ZoomIn } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Image as ImageIcon, ZoomIn, Gauge } from "lucide-react";
 
 interface Record {
   id?: number;
@@ -20,6 +20,7 @@ interface Record {
   peneira: string;
   responsavel: string;
   foto?: string;
+  pressao_caldeira?: number; // Novo campo da caldeira
 }
 
 interface ProductionTableProps {
@@ -30,14 +31,14 @@ export function ProductionTable({ records }: ProductionTableProps) {
   // Estado para controlar qual imagem está aberta no modal
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  // Função auxiliar para garantir que o Base64 tenha o prefixo correto para exibir
+  // Função auxiliar para garantir que o Base64 tenha o prefixo correto
   const getRenderableImageSrc = (fotoData: string) => {
     if (!fotoData) return "";
     if (fotoData.startsWith("data:image")) return fotoData;
-    // Assume JPEG se não tiver prefixo (ajuste se necessário)
     return `data:image/jpeg;base64,${fotoData}`;
   };
 
+  // Formata data ou mostra "Agora" se for recente
   const formatDate = (dateString?: string) => {
     if (!dateString) return <span className="text-green-600 font-bold animate-pulse">Agora</span>;
     try {
@@ -57,6 +58,7 @@ export function ProductionTable({ records }: ProductionTableProps) {
             <TableRow className="bg-slate-50 hover:bg-slate-50 text-xs uppercase tracking-wider font-medium text-slate-500">
               <TableHead className="w-[140px]">Data/Hora</TableHead>
               <TableHead className="text-center">Umidade</TableHead>
+              <TableHead className="text-center">Pressão</TableHead> {/* Nova Coluna */}
               <TableHead>Forno</TableHead>
               <TableHead>Tipo</TableHead>
               <TableHead>Peneira</TableHead>
@@ -66,7 +68,7 @@ export function ProductionTable({ records }: ProductionTableProps) {
           <TableBody>
             {records.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-slate-400 font-medium">
+                <TableCell colSpan={7} className="text-center py-8 text-slate-400 font-medium">
                   Nenhum registro encontrado hoje.
                 </TableCell>
               </TableRow>
@@ -80,6 +82,7 @@ export function ProductionTable({ records }: ProductionTableProps) {
                     {formatDate(record.data_hora)}
                   </TableCell>
                   
+                  {/* UMIDADE */}
                   <TableCell className="text-center">
                     <Badge 
                       variant={record.umidade > 14 || record.umidade < 10 ? "destructive" : "outline"}
@@ -92,16 +95,24 @@ export function ProductionTable({ records }: ProductionTableProps) {
                       {record.umidade.toFixed(1)}%
                     </Badge>
                   </TableCell>
+
+                  {/* PRESSÃO CALDEIRA (IoT) */}
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center gap-1 text-slate-600 font-mono text-xs">
+                        <Gauge className="w-3 h-3 text-slate-400" />
+                        {record.pressao_caldeira ? record.pressao_caldeira + " Bar" : "-"}
+                    </div>
+                  </TableCell>
                   
                   <TableCell>{record.forno}</TableCell>
                   <TableCell>{record.tipo_farinha}</TableCell>
                   <TableCell>{record.peneira}</TableCell>
                   
+                  {/* FOTO COM ZOOM */}
                   <TableCell className="text-right pr-4">
                     {imgSrc ? (
-                      // O GATILHO: Ao clicar, define a imagem selecionada
                       <div 
-                        className="relative group w-12 h-12 ml-auto overflow-hidden rounded-lg border-2 border-slate-200 cursor-zoom-in bg-slate-100 hover:border-blue-400 transition-all shadow-sm hover:shadow-md"
+                        className="relative group w-12 h-12 ml-auto overflow-hidden rounded-lg border-2 border-slate-200 cursor-zoom-in bg-slate-100 hover:border-green-400 transition-all shadow-sm hover:shadow-md"
                         onClick={() => setSelectedImage(imgSrc)}
                         role="button"
                         aria-label="Ver evidência ampliada"
@@ -111,9 +122,8 @@ export function ProductionTable({ records }: ProductionTableProps) {
                            alt="Amostra" 
                            className="w-full h-full object-cover transition-transform group-hover:scale-110"
                          />
-                         {/* Ícone de lupa que aparece no hover */}
-                         <div className="absolute inset-0 bg-black/0 transition-all group-hover:bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100">
-                           <ZoomIn className="text-white w-5 h-5 drop-shadow-md" />
+                         <div className="absolute inset-0 bg-black/0 transition-all group-hover:bg-black/10 flex items-center justify-center opacity-0 group-hover:opacity-100">
+                           <ZoomIn className="text-white w-5 h-5 drop-shadow-sm" />
                          </div>
                       </div>
                     ) : (
@@ -127,17 +137,16 @@ export function ProductionTable({ records }: ProductionTableProps) {
         </Table>
       </div>
 
-      {/* O MODAL (DIALOG) DE VISUALIZAÇÃO */}
+      {/* MODAL DE VISUALIZAÇÃO */}
       <Dialog open={!!selectedImage} onOpenChange={(open) => !open && setSelectedImage(null)}>
-        <DialogContent className="sm:max-w-3xl p-0 overflow-hidden bg-transparent border-none shadow-none flex items-center justify-center outline-none">
-            {/* Fundo escuro semi-transparente atrás da imagem */}
+        <DialogContent className="sm:max-w-4xl p-0 overflow-hidden bg-transparent border-none shadow-none flex items-center justify-center outline-none">
             <div className="relative flex items-center justify-center p-4 w-full h-full" onClick={() => setSelectedImage(null)}>
               {selectedImage && (
                 <img 
                   src={selectedImage} 
                   alt="Evidência Ampliada" 
-                  className="w-auto h-auto max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-300 bg-white"
-                  onClick={(e) => e.stopPropagation()} // Evita fechar se clicar na imagem em si
+                  className="w-auto h-auto max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-300 bg-white"
+                  onClick={(e) => e.stopPropagation()} 
                 />
               )}
             </div>
