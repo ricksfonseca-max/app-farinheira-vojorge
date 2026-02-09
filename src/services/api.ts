@@ -4,12 +4,17 @@ export interface RegistroProducao {
   id?: number;
   data_hora?: string;
   umidade: number;
+  pressao: number; // <--- NOVO
   forno: string;
   tipo_farinha: string;
   peneira: string;
   responsavel: string;
   foto?: string;
 }
+
+
+
+
 
 export const api = {
   salvar: async (dados: RegistroProducao) => {
@@ -45,3 +50,5 @@ export const api = {
     }
   }
 };
+
+
