@@ -1,22 +1,22 @@
-// Adicionamos o campo 'foto' (opcional) nas duas interfaces
-
 export interface ProductionRecord {
   id: number;
   data: string;
   hora: string;
   umidade: number;
+  pressao: number;     // <--- NOVO: Pressão do Vapor/Manômetro
   forno: string;
-  tipoFarinha: string; // Campo mantido
-  peneira: string;     // A famosa Bica
+  tipoFarinha: string;
+  peneira: string;
   responsavel: string;
-  foto?: string;       // <--- NOVO CAMPO
+  foto?: string;
 }
 
 export interface ProductionFormData {
   umidade: number;
+  pressao: number;     // <--- NOVO
   forno: string;
   tipoFarinha: string;
   peneira: string;
-  usuario: string;     // Importante para saber quem enviou
-  foto?: string;       // <--- NOVO CAMPO
+  usuario: string;
+  foto?: string;
 }
