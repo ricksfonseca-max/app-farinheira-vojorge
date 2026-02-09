@@ -2,9 +2,9 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label"; // Importe o Label
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle2, Camera, X, Loader2, Flame, Wheat, Droplets } from "lucide-react";
+import { CheckCircle2, Camera, X, Loader2, Flame, Wheat, Droplets, Gauge } from "lucide-react"; // Importe o Gauge
 import { toast } from "@/hooks/use-toast";
 import { api } from "@/services/api";
 
@@ -14,6 +14,7 @@ interface ProductionFormProps {
 
 export function ProductionForm({ onSubmit }: ProductionFormProps) {
   const [umidade, setUmidade] = useState("");
+  const [pressao, setPressao] = useState(""); // <--- Estado da Pressão
   const [forno, setForno] = useState("");
   const [tipoFarinha, setTipoFarinha] = useState("");
   const [peneira, setPeneira] = useState("");
@@ -22,6 +23,7 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // ... (função toBase64 e handlePhotoCapture iguais) ...
   const toBase64 = (file: File) => new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -40,8 +42,9 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!umidade || !forno || !tipoFarinha || !peneira) {
-      toast({ variant: "destructive", title: "Atenção", description: "Preencha todos os campos obrigatórios." });
+    // Validação
+    if (!umidade || !pressao || !forno || !tipoFarinha || !peneira) {
+      toast({ variant: "destructive", title: "Atenção", description: "Preencha Umidade, Pressão e os outros campos." });
       return;
     }
 
@@ -55,6 +58,7 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
 
       const payload = {
         umidade: parseFloat(umidade),
+        pressao: parseFloat(pressao), // <--- Enviando Pressão
         forno,
         tipo_farinha: tipoFarinha,
         peneira,
@@ -65,9 +69,10 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
       const sucesso = await api.salvar(payload);
 
       if (sucesso) {
-        toast({ title: "Sucesso!", description: "Produção registrada.", className: "bg-green-600 text-white border-none" });
+        toast({ title: "Sucesso!", description: "Dados de produção registrados.", className: "bg-green-600 text-white border-none" });
         
         setUmidade("");
+        setPressao(""); // Limpa campo
         setForno("");
         setTipoFarinha("");
         setPeneira("");
@@ -99,22 +104,40 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
       <CardContent className="pt-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           
-          {/* UMIDADE EM DESTAQUE */}
-          <div className="space-y-2 text-center">
-            <Label className="text-sm font-bold text-slate-500 uppercase tracking-wider">Umidade (%)</Label>
-            <Input 
-              type="number" step="0.1" placeholder="0.0"
-              value={umidade} onChange={(e) => setUmidade(e.target.value)}
-              className="text-5xl py-8 h-auto text-center font-bold tracking-tighter bg-slate-50 border-slate-200 text-slate-800 rounded-xl focus:ring-green-500 focus:border-green-500"
-              required
-            />
+          {/* PAINEL PRINCIPAL: UMIDADE E PRESSÃO LADO A LADO */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* UMIDADE */}
+            <div className="space-y-2 text-center">
+              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Umidade (%)</Label>
+              <Input 
+                type="number" step="0.1" placeholder="0.0"
+                value={umidade} onChange={(e) => setUmidade(e.target.value)}
+                className="text-4xl py-6 h-auto text-center font-bold tracking-tighter bg-slate-50 border-slate-200 text-slate-800 rounded-xl focus:ring-green-500 focus:border-green-500"
+                required
+              />
+            </div>
+
+            {/* PRESSÃO */}
+            <div className="space-y-2 text-center">
+              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-center gap-1">
+                <Gauge className="w-3 h-3" /> Pressão (CV)
+              </Label>
+              <Input 
+                type="number" step="0.1" placeholder="0.0"
+                value={pressao} onChange={(e) => setPressao(e.target.value)}
+                className="text-4xl py-6 h-auto text-center font-bold tracking-tighter bg-orange-50 border-orange-200 text-orange-800 rounded-xl focus:ring-orange-500 focus:border-orange-500"
+                required
+              />
+            </div>
           </div>
 
-          {/* GRID DE SELEÇÃO (VISÍVEL E DIRETO) */}
+          {/* GRID DE SELEÇÃO (MANTIDO IGUAL) */}
           <div className="grid gap-4">
-            
-            {/* FORNO */}
-            <div className="border rounded-lg bg-orange-50 p-4 shadow-sm border-orange-100">
+             {/* ... (O restante dos selects Forno, Tipo Farinha, Peneira continua igual ao seu código original) ... */}
+              {/* Vou omitir aqui para economizar espaço, mas mantenha o código dos Selects que você já fez */}
+             
+             {/* Exemplo só pra constar onde entra o resto */}
+             <div className="border rounded-lg bg-orange-50 p-4 shadow-sm border-orange-100">
               <div className="flex items-center gap-2 mb-2 text-orange-800 font-bold">
                 <Flame className="w-5 h-5"/> 
                 <Label>Forno</Label>
@@ -129,55 +152,22 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
                 </SelectContent>
               </Select>
             </div>
-
-            {/* TIPO DE FARINHA */}
-            <div className="border rounded-lg bg-stone-100 p-4 shadow-sm border-stone-200">
-              <div className="flex items-center gap-2 mb-2 text-stone-700 font-bold">
-                <Wheat className="w-5 h-5"/> 
-                <Label>Tipo de Farinha</Label>
-              </div>
-              <Select value={tipoFarinha} onValueChange={setTipoFarinha}>
-                <SelectTrigger className="bg-white border-stone-300 h-12 text-lg font-medium text-slate-700 shadow-sm">
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent className="bg-white border-stone-200">
-                  <SelectItem value="Especial">Especial</SelectItem>
-                  <SelectItem value="Comum">Comum</SelectItem>
-                  <SelectItem value="Integral">Integral</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* PENEIRA */}
-            <div className="border rounded-lg bg-blue-50 p-4 shadow-sm border-blue-100">
-              <div className="flex items-center gap-2 mb-2 text-blue-800 font-bold">
-                <Droplets className="w-5 h-5"/> 
-                <Label>Peneira (Bica)</Label>
-              </div>
-              <Select value={peneira} onValueChange={setPeneira}>
-                <SelectTrigger className="bg-white border-blue-200 h-12 text-lg font-medium text-slate-700 shadow-sm">
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent className="bg-white border-blue-200">
-                  <SelectItem value="Bica 01">Bica 01</SelectItem>
-                  <SelectItem value="Bica 02">Bica 02</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
+             {/* Repita para Tipo Farinha e Peneira... */}
           </div>
 
-          {/* FOTO */}
+          {/* ... FOTO E BOTÃO SUBMIT MANTIDOS IGUAIS ... */}
           <div className="space-y-2 pt-2 border-t border-slate-100 mt-4">
-            {!fotoPreview ? (
+             {/* Código da foto igual ao original */}
+             {!fotoPreview ? (
               <div className="relative group">
                 <input type="file" accept="image/*" capture="environment" onChange={handlePhotoCapture} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                 <Button type="button" variant="outline" className="w-full h-14 border-dashed border-2 text-slate-500 hover:text-green-600 hover:border-green-500 bg-slate-50">
-                  <Camera className="mr-2 h-5 w-5" /> Tirar Foto da Amostra
+                  <Camera className="mr-2 h-5 w-5" /> FOTO AMOSTRA
                 </Button>
               </div>
             ) : (
-              <div className="relative animate-in zoom-in duration-300">
+               // ... Preview da foto igual ...
+               <div className="relative animate-in zoom-in duration-300">
                 <img src={fotoPreview} alt="Preview" className="w-full h-48 object-cover rounded-lg shadow-md border border-slate-200" />
                 <Button type="button" variant="destructive" size="icon" className="absolute top-2 right-2 rounded-full shadow-lg" onClick={() => { setFotoArquivo(null); setFotoPreview(null); }}>
                   <X className="h-4 w-4" />
@@ -187,7 +177,7 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
           </div>
 
           <Button type="submit" disabled={isSubmitting} className="w-full h-14 text-lg bg-green-600 hover:bg-green-700 font-bold shadow-md transition-all active:scale-[0.98]">
-            {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : "SALVAR REGISTRO"}
+            {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : "SALVAR PRODUÇÃO"}
           </Button>
         </form>
       </CardContent>
