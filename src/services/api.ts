@@ -1,54 +1,15 @@
-const API_BASE = "https://nodered-v2.fsk.tec.br/api";
-
-export interface RegistroProducao {
-  id?: number;
-  data_hora?: string;
-  umidade: number;
-  pressao: number; // <--- NOVO
-  forno: string;
-  tipo_farinha: string;
-  peneira: string;
-  responsavel: string;
-  foto?: string;
-}
-
-
-
-
-
 export const api = {
-  salvar: async (dados: RegistroProducao) => {
+  salvar: async (payload: any) => {
     try {
-      console.log("Enviando dados:", dados); // Debug
-      const res = await fetch(`${API_BASE}/producao`, {
+      const response = await fetch('https://api.fsk.tec.br/api/registro-qualidade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dados)
+        body: JSON.stringify({ ...payload, data_hora: new Date().toISOString() }),
       });
-
-      if (!res.ok) {
-        const erroTexto = await res.text();
-        console.error("Erro Servidor:", res.status, erroTexto);
-        return false;
-      }
-      
-      return true;
+      return response.ok;
     } catch (error) {
-      console.error("Erro Rede/Fetch:", error);
+      console.error("Erro na API Global:", error);
       return false;
-    }
-  },
-
-  listar: async (): Promise<RegistroProducao[]> => {
-    try {
-      const res = await fetch(`${API_BASE}/producao`);
-      if (!res.ok) throw new Error("Falha ao buscar");
-      return await res.json();
-    } catch (error) {
-      console.error("Erro Listar:", error);
-      return [];
     }
   }
 };
-
-

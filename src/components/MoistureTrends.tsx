@@ -1,215 +1,127 @@
-import { useState, useMemo } from "react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, Activity, Filter, X } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { format } from "date-fns";
+import { X } from "lucide-react";
 
 export function MoistureTrends({ records }: { records: any[] }) {
-  const [selectedForno, setSelectedForno] = useState<string>("all");
-  const [dateStart, setDateStart] = useState("");
-  const [dateEnd, setDateEnd] = useState("");
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
 
-  // Processamento dos dados
-  const chartData = useMemo(() => {
-    // 1. Filtra os dados
-    let filteredData = records.filter(r => {
-      // Normaliza a data do registro para YYYY-MM-DD (ignorando hora e fuso)
-      const dataRegistro = r.data.toString().split('T')[0];
-      
-      // Filtro de Forno
-      if (selectedForno !== "all" && r.forno.toString() !== selectedForno) {
-        return false;
-      }
+  if (!records || records.length === 0) {
+    return (
+      <Card className="shadow-lg border-t-4 border-t-blue-600 bg-white">
+        <div className="p-16 text-center text-slate-500 font-medium">
+          Nenhum dado registrado para gerar os gráficos.
+        </div>
+      </Card>
+    );
+  }
 
-      // Filtro Data Inicial
-      if (dateStart && dataRegistro < dateStart) {
-        return false;
-      }
-
-      // Filtro Data Final
-      if (dateEnd && dataRegistro > dateEnd) {
-        return false;
-      }
-
+  // Filtra os registros pelo intervalo de datas selecionado
+  const filteredRecords = records.filter(record => {
+    if (!dataInicio && !dataFim) return true; // Se não tem filtro, mostra tudo
+    
+    try {
+      const recordDate = new Date(record.data_hora).toISOString().split('T')[0];
+      if (dataInicio && recordDate < dataInicio) return false;
+      if (dataFim && recordDate > dataFim) return false;
       return true;
-    });
+    } catch (e) {
+      return true;
+    }
+  });
 
-    // 2. Ordena Cronologicamente (Antigo -> Novo)
-    filteredData.sort((a, b) => {
-      const dateA = new Date(`${a.data.toString().split('T')[0]}T${a.hora}`);
-      const dateB = new Date(`${b.data.toString().split('T')[0]}T${b.hora}`);
-      return dateA.getTime() - dateB.getTime();
-    });
+  // Prepara os dados pro gráfico
+  const chartData = [...filteredRecords].reverse().map(record => ({
+    horaExibicao: format(new Date(record.data_hora), "dd/MM HH:mm"),
+    Umidade: record.umidade,
+    Pressão: record.pressao,
+    Forno: record.forno,
+    Operador: record.responsavel
+  }));
 
-    // 3. Formata para o Gráfico
-    return filteredData.map(r => {
-      // Formata data visualmente (DD/MM)
-      const [ano, mes, dia] = r.data.toString().split('T')[0].split('-');
-      
-      return {
-        label: `${dia}/${mes} ${r.hora.slice(0, 5)}`, // Eixo X
-        fullDate: `${dia}/${mes}/${ano} às ${r.hora}`, // Tooltip
-        umidade: parseFloat(r.umidade),
-        forno: `Forno ${r.forno}`,
-        responsavel: r.responsavel
-      };
-    });
-  }, [records, selectedForno, dateStart, dateEnd]);
-
-  // Lista de fornos disponíveis
-  const fornosDisponiveis = useMemo(() => {
-    const fornosReais = Array.from(new Set(records.map(r => r.forno.toString()))).sort();
-    if (fornosReais.length === 0) return ["1", "2", "3"];
-    return fornosReais;
-  }, [records]);
-
-  const clearFilters = () => {
-    setSelectedForno("all");
-    setDateStart("");
-    setDateEnd("");
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white p-4 border border-slate-200 rounded-lg shadow-xl z-50">
+          <p className="font-bold text-slate-700 border-b pb-2 mb-2">⏰ {label}</p>
+          <p className="text-blue-600 font-bold">💧 Umidade: {payload[0].value}%</p>
+          <p className="text-orange-600 font-bold">🔥 Pressão: {payload[1].value} Bar</p>
+          <p className="text-slate-500 text-sm mt-2 pt-2 border-t">👨‍🔧 {payload[0].payload.Operador}</p>
+        </div>
+      );
+    }
+    return null;
   };
 
   return (
-    <Card className="border-t-4 border-t-green-600 shadow-xl bg-white animate-in fade-in duration-700">
-      <CardHeader className="pb-4">
-        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+    <Card className="shadow-lg border-t-4 border-t-blue-600 bg-white">
+      <CardHeader className="border-b border-slate-100 pb-4 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+        <CardTitle className="text-xl text-slate-800 flex items-center gap-2">
+          📈 Secagem vs Pressão
+        </CardTitle>
+        
+        {/* FILTRO DE DATA MAIS LARGO E ALTO PARA CELULAR */}
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto bg-slate-50 p-3 rounded-xl border border-slate-200 shadow-sm">
           
-          {/* Título */}
-          <div className="space-y-1">
-            <CardTitle className="text-xl font-black text-slate-800 flex items-center gap-2">
-              <TrendingUp className="text-green-600" /> TENDÊNCIA DE UMIDADE
-            </CardTitle>
-            <p className="text-xs text-slate-400 uppercase font-bold tracking-widest">
-              Controle de Qualidade ({chartData.length} registros visíveis)
-            </p>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="text-sm font-bold text-slate-500 uppercase w-8">De:</span>
+            <Input 
+              type="date" 
+              value={dataInicio} 
+              onChange={(e) => setDataInicio(e.target.value)} 
+              className="h-12 w-full sm:w-[160px] text-sm bg-white focus-visible:ring-blue-500 border-slate-300 font-medium"
+            />
+          </div>
+          
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="text-sm font-bold text-slate-500 uppercase w-8">Até:</span>
+            <Input 
+              type="date" 
+              value={dataFim} 
+              onChange={(e) => setDataFim(e.target.value)} 
+              className="h-12 w-full sm:w-[160px] text-sm bg-white focus-visible:ring-blue-500 border-slate-300 font-medium"
+            />
           </div>
 
-          {/* Filtros */}
-          <div className="flex flex-col sm:flex-row flex-wrap items-end gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100 w-full xl:w-auto">
-            
-            <div className="space-y-1 w-full sm:w-auto">
-              <span className="text-[10px] font-bold text-slate-500 uppercase ml-1">Forno</span>
-              <Select value={selectedForno} onValueChange={setSelectedForno}>
-                <SelectTrigger className="w-full sm:w-[180px] h-10 text-sm font-bold bg-white border-slate-200">
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os Fornos</SelectItem>
-                  {fornosDisponiveis.map(f => (
-                    <SelectItem key={f} value={f}>Forno {f}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1 w-full sm:w-auto">
-              <span className="text-[10px] font-bold text-slate-500 uppercase ml-1">Data Inicial</span>
-              <Input 
-                type="date" 
-                value={dateStart}
-                onChange={(e) => setDateStart(e.target.value)}
-                className="w-full sm:w-[160px] h-10 text-sm bg-white border-slate-200 cursor-pointer"
-              />
-            </div>
-
-            <div className="space-y-1 w-full sm:w-auto">
-              <span className="text-[10px] font-bold text-slate-500 uppercase ml-1">Data Final</span>
-              <Input 
-                type="date" 
-                value={dateEnd}
-                onChange={(e) => setDateEnd(e.target.value)}
-                className="w-full sm:w-[160px] h-10 text-sm bg-white border-slate-200 cursor-pointer"
-              />
-            </div>
-
-            {(selectedForno !== "all" || dateStart || dateEnd) && (
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={clearFilters}
-                className="h-10 w-10 text-slate-400 hover:text-red-500 hover:bg-red-50 mb-[1px]"
-                title="Limpar Filtros"
-              >
-                <X size={20} />
-              </Button>
-            )}
-          </div>
+          {(dataInicio || dataFim) && (
+            <Button 
+              variant="outline" 
+              onClick={() => {setDataInicio(""); setDataFim("");}} 
+              className="h-12 w-full sm:w-auto text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 font-bold flex gap-2"
+            >
+              <X className="w-5 h-5" /> Limpar
+            </Button>
+          )}
+          
         </div>
       </CardHeader>
-      
-      <CardContent>
-        <div className="h-[400px] w-full mt-2">
-          {chartData.length > 0 ? (
+
+      <CardContent className="pt-6">
+        {chartData.length === 0 ? (
+          <div className="h-[450px] w-full flex flex-col items-center justify-center text-slate-500 font-medium">
+            <p className="text-4xl mb-4">📭</p>
+            <p>Nenhum registro encontrado neste período.</p>
+          </div>
+        ) : (
+          <div className="h-[450px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 10, right: 10, bottom: 20, left: -20 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis 
-                  dataKey="label" 
-                  fontSize={10} 
-                  tickLine={false} 
-                  axisLine={false} 
-                  tick={{fill: '#94a3b8', fontWeight: 600}}
-                  interval="preserveStartEnd"
-                  angle={-45}
-                  textAnchor="end"
-                  height={50}
-                />
-                <YAxis 
-                  domain={['auto', 'auto']} 
-                  fontSize={12} 
-                  tickLine={false} 
-                  axisLine={false} 
-                  tick={{fill: '#94a3b8'}}
-                  unit="%"
-                />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                  labelStyle={{ color: '#64748b', fontWeight: 'bold', marginBottom: '5px' }}
-                  cursor={{ stroke: '#22c55e', strokeWidth: 1, strokeDasharray: '5 5' }}
-                  formatter={(value: any, name: any, props: any) => [
-                    <span className="text-green-700 font-bold text-lg">{value}%</span>, 
-                    <span className="text-slate-600 font-medium">{props.payload.forno}</span>
-                  ]}
-                  labelFormatter={(label, payload) => {
-                    if (payload && payload.length > 0) return payload[0].payload.fullDate;
-                    return label;
-                  }} 
-                />
-                <Legend verticalAlign="top" height={36}/>
-                <Line 
-                  name="Umidade (%)"
-                  type="monotone" 
-                  dataKey="umidade" 
-                  stroke="#16a34a" 
-                  strokeWidth={3} 
-                  dot={{ r: 4, fill: "#16a34a", strokeWidth: 2, stroke: "#fff" }}
-                  activeDot={{ r: 6, strokeWidth: 0, fill: "#15803d" }}
-                  animationDuration={1000}
-                />
+              <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <XAxis dataKey="horaExibicao" stroke="#94a3b8" fontSize={12} tickMargin={10} />
+                <YAxis yAxisId="left" stroke="#3b82f6" fontSize={12} tickFormatter={(val) => `${val}%`} />
+                <YAxis yAxisId="right" orientation="right" stroke="#f97316" fontSize={12} tickFormatter={(val) => `${val} Bar`} />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend wrapperStyle={{ paddingTop: '20px' }} iconType="circle" />
+                <Line yAxisId="left" type="monotone" dataKey="Umidade" name="Umidade (%)" stroke="#3b82f6" strokeWidth={4} activeDot={{ r: 8 }} animationDuration={1500} />
+                <Line yAxisId="right" type="monotone" dataKey="Pressão" name="Pressão (Bar)" stroke="#f97316" strokeWidth={4} activeDot={{ r: 8 }} animationDuration={1500} />
               </LineChart>
             </ResponsiveContainer>
-          ) : (
-            <div className="h-full flex flex-col items-center justify-center text-slate-400 bg-slate-50/50 rounded-xl border-2 border-dashed border-slate-200">
-              <Filter className="h-10 w-10 mb-2 opacity-20" />
-              <p>Nenhum registro encontrado para este filtro.</p>
-              <Button variant="link" onClick={clearFilters} className="text-green-600 font-bold">
-                Limpar filtros
-              </Button>
-            </div>
-          )}
-        </div>
-        
-        <div className="mt-4 p-4 bg-green-50 rounded-2xl border border-green-100 flex items-start gap-3">
-          <Activity className="text-green-600 h-5 w-5 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-slate-700">
-            <p className="font-bold text-green-800">Dica de Análise:</p>
-            <p className="leading-relaxed mt-1">
-              Para ver apenas o dia de hoje, selecione a mesma data nos campos "De" e "Até".
-            </p>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );
