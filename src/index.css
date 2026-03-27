@@ -7,8 +7,8 @@
 @layer base {
   :root {
     /* --- MODO ESCURO INDUSTRIAL (DARK MODE) --- */
-    --background: 222.2 84% 4.9%;  /* Fundo Escuro */
-    --foreground: 210 40% 98%;     /* Texto Branco */
+    --background: 222.2 84% 4.9%;  
+    --foreground: 210 40% 98%;     
     
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
@@ -16,7 +16,7 @@
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
     
-    /* COR VERDE INDUSTRIAL (Mantida do seu original) */
+    /* COR VERDE INDUSTRIAL */
     --primary: 142.1 76.2% 36.3%; 
     --primary-foreground: 355.7 100% 97.3%;
     
@@ -44,7 +44,6 @@
     @apply border-border;
   }
   body {
-    /* CORREÇÃO AQUI: bg-background puxa a cor escura de cima */
     @apply bg-background text-foreground; 
     font-family: 'Inter', sans-serif;
   }
