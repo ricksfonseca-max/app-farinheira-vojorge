@@ -6,27 +6,34 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    /* --- MODO ESCURO INDUSTRIAL (DARK MODE) --- */
+    --background: 222.2 84% 4.9%;  /* Fundo Escuro */
+    --foreground: 210 40% 98%;     /* Texto Branco */
     
-    /* COR VERDE INDUSTRIAL */
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    
+    /* COR VERDE INDUSTRIAL (Mantida do seu original) */
     --primary: 142.1 76.2% 36.3%; 
     --primary-foreground: 355.7 100% 97.3%;
     
-    --secondary: 142.1 20% 96%;
-    --secondary-foreground: 142.1 76.2% 10%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
     --ring: 142.1 76.2% 36.3%;
     --radius: 0.75rem;
   }
@@ -37,7 +44,8 @@
     @apply border-border;
   }
   body {
-    @apply bg-slate-50 text-foreground;
+    /* CORREÇÃO AQUI: bg-background puxa a cor escura de cima */
+    @apply bg-background text-foreground; 
     font-family: 'Inter', sans-serif;
   }
 }
