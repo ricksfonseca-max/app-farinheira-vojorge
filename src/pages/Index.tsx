@@ -1,7 +1,5 @@
 import { useState } from "react";
-import { useAuth } from "@/hooks/useAuth";
 import { useProductionRecords } from "@/hooks/useProductionRecords";
-import { AuthForm } from "@/components/AuthForm";
 import { ProductionForm } from "@/components/ProductionForm";
 import { ProductionTable } from "@/components/ProductionTable";
 import { MoistureTrends } from "@/components/MoistureTrends";
@@ -9,35 +7,19 @@ import { Header } from "@/components/Header";
 import { Loader2, ListChecks, BarChart3, LayoutDashboard } from "lucide-react";
 
 export default function Index() {
-  const { user, loading: authLoading, logout } = useAuth();
-  
-  // Pegamos o refetch (função que recarrega a tabela)
   const { records, isLoading, refetch } = useProductionRecords();
-  
   const [activeTab, setActiveTab] = useState<'registros' | 'graficos'>('registros');
 
-  // --- O SEGREDO ESTÁ AQUI ---
   const handleFormSuccess = () => {
-    // 1. Atualiza imediatamente (Tenta sorte)
     refetch();
-    
-    // 2. Atualiza de novo após 500ms (Garante que o MySQL terminou de gravar)
-    setTimeout(() => {
-      console.log("Atualizando tabela (Delay de segurança)...");
-      refetch();
-    }, 500);
+    setTimeout(() => refetch(), 500);
   };
 
-  if (authLoading) return <div className="flex h-screen items-center justify-center bg-[#020817]"><Loader2 className="animate-spin text-emerald-500 h-12 w-12"/></div>;
-  if (!user) return <AuthForm />;
-
   return (
-    // FUNDO PRINCIPAL ESCURO
     <div className="min-h-screen bg-[#020817] text-slate-200 pb-10 font-sans selection:bg-emerald-500/30">
-      <Header user={user} onLogout={logout} />
+      <Header />
       
       <main className="container mx-auto px-4 py-6 max-w-[95%]">
-        {/* Menu de Abas SCADA */}
         <div className="flex items-center gap-4 mb-6 border-b border-slate-800 pb-1">
           <button onClick={() => setActiveTab('registros')} className={`flex gap-2 px-6 py-3 text-sm font-bold border-b-2 transition-all ${activeTab === 'registros' ? "border-emerald-500 text-emerald-400 bg-emerald-500/10" : "border-transparent text-slate-500 hover:text-slate-300"}`}>
             <LayoutDashboard size={18} /> PAINEL
@@ -49,7 +31,6 @@ export default function Index() {
 
         {activeTab === 'registros' && (
            <div className="animate-in fade-in duration-500 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-               {/* Formulário (Esquerda) */}
                <div className="lg:col-span-4 xl:col-span-3">
                  <div className="sticky top-4">
                    <div className="bg-slate-900 rounded-xl shadow-2xl border border-slate-800 overflow-hidden p-1">
@@ -58,7 +39,6 @@ export default function Index() {
                  </div>
                </div>
 
-               {/* Tabela (Direita) */}
                <div className="lg:col-span-8 xl:col-span-9">
                   {isLoading ? (
                     <div className="bg-slate-900 p-20 text-center rounded-xl shadow-2xl border border-slate-800">
