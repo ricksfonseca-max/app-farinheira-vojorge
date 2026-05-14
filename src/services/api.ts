@@ -11,6 +11,11 @@ export interface RegistroProducao {
   peneira: string;
   responsavel: string;
   foto?: string;
+  // --- NOVAS GAVETAS ADICIONADAS ---
+  turno_num?: number;
+  cliente?: string;
+  produto?: string;
+  ensaque?: string;
 }
 
 export const api = {
