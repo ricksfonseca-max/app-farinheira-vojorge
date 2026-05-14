@@ -1,4 +1,3 @@
-// 1. Apontamos para o túnel correto da sua API
 const API_BASE = "https://api.fsk.tec.br/api";
 
 export interface RegistroProducao {
@@ -11,7 +10,7 @@ export interface RegistroProducao {
   peneira: string;
   responsavel: string;
   foto?: string;
-  // --- NOVAS GAVETAS ADICIONADAS ---
+  // --- NOVAS COLUNAS ADICIONADAS ---
   turno_num?: number;
   cliente?: string;
   produto?: string;
@@ -19,42 +18,28 @@ export interface RegistroProducao {
 }
 
 export const api = {
-  // 2. Método SALVAR (POST) apontando para a rota certa
   salvar: async (dados: RegistroProducao) => {
     try {
-      // Injeta a data e hora automaticamente, tal como funcionava antes
       const payloadCompleto = { ...dados, data_hora: new Date().toISOString() };
-      console.log("Enviando dados:", payloadCompleto);
-
-      // Rota correta do Node-RED: /registro-qualidade
       const res = await fetch(`${API_BASE}/registro-qualidade`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payloadCompleto)
       });
-
-      if (!res.ok) {
-        const erroTexto = await res.text();
-        console.error("Erro Servidor:", res.status, erroTexto);
-        return false;
-      }
-      
-      return true;
+      return res.ok;
     } catch (error) {
-      console.error("Erro Rede/Fetch:", error);
+      console.error("Erro ao salvar:", error);
       return false;
     }
   },
 
-  // 3. Método LISTAR (GET) apontando para a rota certa
   listar: async (): Promise<RegistroProducao[]> => {
     try {
-      // Rota correta do Node-RED: /registros
       const res = await fetch(`${API_BASE}/registros`);
       if (!res.ok) throw new Error("Falha ao buscar");
       return await res.json();
     } catch (error) {
-      console.error("Erro Listar:", error);
+      console.error("Erro ao listar:", error);
       return [];
     }
   }
