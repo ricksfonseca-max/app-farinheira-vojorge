@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle2, Camera, X, Loader2, Flame, Wheat, Droplets, Gauge, User, GripHorizontal, Building2, Package, Box } from "lucide-react";
+import { CheckCircle2, Camera, X, Loader2, Flame, Wheat, Droplets, Gauge, User, Building2, Package, Box } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { api } from "@/services/api";
 
@@ -17,28 +17,48 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
   const [forno, setForno] = useState("");
   const [tipoFarinha, setTipoFarinha] = useState(""); 
   const [peneira, setPeneira] = useState("");
-  // --- NOVOS ESTADOS ---
   const [cliente, setCliente] = useState("");
   const [produto, setProduto] = useState("");
   const [ensaque, setEnsaque] = useState("");
   
+  // --- ESTADOS PARA O HISTÓRICO (ÚLTIMOS 5) ---
+  const [historicoClientes, setHistoricoClientes] = useState<string[]>([]);
+  const [historicoProdutos, setHistoricoProdutos] = useState<string[]>([]);
+  const [historicoEnsaques, setHistoricoEnsaques] = useState<string[]>([]);
+  const [historicoPeneiras, setHistoricoPeneiras] = useState<string[]>([]);
+
   const [fotoArquivo, setFotoArquivo] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // --- BUSCA PRESSÃO DO NODE-RED ---
+  // Carrega o histórico salvo no navegador ao abrir a tela
   useEffect(() => {
+    const load = (key: string) => JSON.parse(localStorage.getItem(key) || "[]");
+    setHistoricoClientes(load("hist_clientes"));
+    setHistoricoProdutos(load("hist_produtos"));
+    setHistoricoEnsaques(load("hist_ensaques"));
+    setHistoricoPeneiras(load("hist_peneiras"));
+
+    // Busca Pressão
     const puxarPressao = async () => {
       try {
         const res = await fetch('https://api.fsk.tec.br/api/pressao-forno');
         const data = await res.json();
         if (data && data.pressao !== undefined) setPressao(data.pressao.toString());
-      } catch (e) { console.error("Erro leitura pressão:", e); }
+      } catch (e) { console.error(e); }
     };
     puxarPressao();
     const interval = setInterval(puxarPressao, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  // Função para salvar novo item no histórico (máximo 5)
+  const salvarNoHistorico = (lista: string[], novoItem: string, key: string) => {
+    if (!novoItem) return;
+    const novaLista = [novoItem, ...lista.filter(i => i !== novoItem)].slice(0, 5);
+    localStorage.setItem(key, JSON.stringify(novaLista));
+    return novaLista;
+  };
 
   const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -59,11 +79,12 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
     try {
       let fotoString = ""; if (fotoArquivo) fotoString = await toBase64(fotoArquivo);
       
-      // Lógica de 3 Turnos
+      // --- CONFIGURAÇÃO DE TURNOS ---
       const hora = new Date().getHours();
-      let turno = 3;
-      if (hora >= 6 && hora < 14) turno = 1;
-      else if (hora >= 14 && hora < 22) turno = 2;
+      let turno = 3; // Turno Noite/Madrugada (padrão)
+      if (hora >= 6 && hora < 14) turno = 1;      // Turno Manhã
+      else if (hora >= 14 && hora < 22) turno = 2; // Turno Tarde
+      // ------------------------------
 
       const sucesso = await api.salvar({
         responsavel, umidade: parseFloat(umidade), pressao: parseFloat(pressao),
@@ -72,6 +93,12 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
       });
 
       if (sucesso) {
+        // Salva nos históricos locais
+        setHistoricoClientes(salvarNoHistorico(historicoClientes, cliente, "hist_clientes") || []);
+        setHistoricoProdutos(salvarNoHistorico(historicoProdutos, produto, "hist_produtos") || []);
+        setHistoricoEnsaques(salvarNoHistorico(historicoEnsaques, ensaque, "hist_ensaques") || []);
+        setHistoricoPeneiras(salvarNoHistorico(historicoPeneiras, peneira, "hist_peneiras") || []);
+
         toast({ title: "Sucesso!", description: "Lote registrado." });
         setUmidade(""); setFotoArquivo(null); setFotoPreview(null); onSubmit();
       }
@@ -89,37 +116,42 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
       <CardContent className="pt-6">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label className="text-xs font-bold text-slate-400 uppercase"><User className="inline w-3 h-3 mr-1"/> Operador</Label>
+            <Label className="text-xs font-bold text-slate-400 uppercase">Operador</Label>
             <Input value={responsavel} onChange={(e) => setResponsavel(e.target.value)} className="bg-slate-900 border-slate-700 text-slate-100" required />
           </div>
 
-          {/* COLUNAS NOVAS: CLIENTE E PRODUTO */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-400 uppercase"><Building2 className="inline w-3 h-3 mr-1"/> Cliente</Label>
-              <Input value={cliente} onChange={(e) => setCliente(e.target.value)} list="lista-clientes" className="bg-slate-900 border-slate-700" placeholder="Opcional" />
-              <datalist id="lista-clientes"><option value="Amafil"/><option value="Yoki"/><option value="Exportação"/></datalist>
+              <Label className="text-xs font-bold text-slate-400 uppercase">Cliente</Label>
+              <Input value={cliente} onChange={(e) => setCliente(e.target.value)} list="list-clientes" className="bg-slate-900 border-slate-700" placeholder="Histórico..." />
+              <datalist id="list-clientes">
+                {historicoClientes.map(h => <option key={h} value={h} />)}
+              </datalist>
             </div>
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-400 uppercase"><Package className="inline w-3 h-3 mr-1"/> Produto</Label>
-              <Input value={produto} onChange={(e) => setProduto(e.target.value)} list="lista-produtos" className="bg-slate-900 border-slate-700" placeholder="Opcional" />
-              <datalist id="lista-produtos"><option value="Amido Nativo"/><option value="Fécula Premium"/></datalist>
+              <Label className="text-xs font-bold text-slate-400 uppercase">Produto</Label>
+              <Input value={produto} onChange={(e) => setProduto(e.target.value)} list="list-produtos" className="bg-slate-900 border-slate-700" placeholder="Histórico..." />
+              <datalist id="list-produtos">
+                {historicoProdutos.map(h => <option key={h} value={h} />)}
+              </datalist>
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs font-bold text-slate-400 uppercase"><Box className="inline w-3 h-3 mr-1"/> Ensaque</Label>
-            <Input value={ensaque} onChange={(e) => setEnsaque(e.target.value)} list="lista-ensaque" className="bg-slate-900 border-slate-700" placeholder="Ex: Saco 25kg" />
-            <datalist id="lista-ensaque"><option value="Saco 25Kg Valvulado"/><option value="Big Bag 1000Kg"/><option value="Saco Papel 25Kg"/></datalist>
+            <Label className="text-xs font-bold text-slate-400 uppercase">Ensaque</Label>
+            <Input value={ensaque} onChange={(e) => setEnsaque(e.target.value)} list="list-ensaques" className="bg-slate-900 border-slate-700" placeholder="Histórico..." />
+            <datalist id="list-ensaques">
+              {historicoEnsaques.map(h => <option key={h} value={h} />)}
+            </datalist>
           </div>
 
           <div className="grid grid-cols-2 gap-4 py-2">
             <div className="space-y-2 text-center">
-              <Label className="text-xs font-bold text-cyan-400 uppercase"><Droplets className="inline w-3 h-3 mr-1"/> Umidade (%)</Label>
+              <Label className="text-xs font-bold text-cyan-400 uppercase">Umidade (%)</Label>
               <Input type="number" step="0.1" value={umidade} onChange={(e) => setUmidade(e.target.value)} className="h-12 text-xl text-center font-bold bg-slate-900 border-slate-700 text-cyan-400" required />
             </div>
             <div className="space-y-2 text-center">
-              <Label className="text-xs font-bold text-orange-400 uppercase"><Gauge className="inline w-3 h-3 mr-1"/> Pressão</Label>
+              <Label className="text-xs font-bold text-orange-400 uppercase">Pressão</Label>
               <Input type="number" step="0.1" value={pressao} onChange={(e) => setPressao(e.target.value)} className="h-12 text-xl text-center font-bold bg-slate-800 border-orange-500/50 text-orange-400" required />
             </div>
           </div>
@@ -136,8 +168,11 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
             </Select>
 
             <div className="space-y-2">
-              <Input value={peneira} onChange={(e) => setPeneira(e.target.value)} list="lista-peneiras" className="bg-slate-900 border-slate-700" placeholder="Peneira (Ex: 1.0mm)" required />
-              <datalist id="lista-peneiras"><option value="Fina (1.0mm)"/><option value="Média (2.0mm)"/><option value="Grossa (3.0mm)"/></datalist>
+              <Label className="text-xs font-bold text-slate-400 uppercase">Peneira</Label>
+              <Input value={peneira} onChange={(e) => setPeneira(e.target.value)} list="list-peneiras" className="bg-slate-900 border-slate-700" placeholder="Peneira (Ex: 1.0mm)" required />
+              <datalist id="list-peneiras">
+                {historicoPeneiras.map(h => <option key={h} value={h} />)}
+              </datalist>
             </div>
           </div>
 
