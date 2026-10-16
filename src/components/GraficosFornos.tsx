@@ -1,15 +1,17 @@
 import { KeyboardEvent, PointerEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Series, TEXTO_MODO, fmt, umidadeApi } from "@/services/umidade";
 
-// Cores validadas contra o fundo escuro do app (#0f172a): azul, laranja e verde-água.
+// Cores dos dados validadas contra o fundo do cartão (#10211a): azul, laranja e verde-água.
 const COR = {
   medido: "#3987e5",
   vapor: "#d95926",
   saida: "#199e70",
-  referencia: "#94a3b8", // setpoint e rotação sugerida (linhas de referência, neutras)
-  faixa: "rgba(148, 163, 184, 0.14)",
-  grade: "#1e293b",
-  eixo: "#64748b",
+  referencia: "#a9bcae", // setpoint e rotação sugerida (linhas de referência, neutras)
+  faixa: "rgba(195, 209, 199, 0.12)",
+  grade: "#23352a",
+  eixo: "#7d9584",
+  superficie: "#10211a",
+  cursor: "#c3d1c7",
 };
 
 const PERIODOS = [
@@ -169,9 +171,9 @@ function Painel({
   return (
     <div className="relative">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2 px-1">
-        <h4 className="text-xs font-bold uppercase tracking-wide text-slate-300">{titulo}</h4>
+        <h4 className="text-xs font-bold uppercase tracking-wide text-mata-300">{titulo}</h4>
         {series.length > 1 && (
-          <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
+          <div className="flex flex-wrap items-center gap-3 text-[11px] text-mata-400">
             {series.map((s) => (
               <span key={s.nome} className="flex items-center gap-1.5">
                 <svg width="18" height="8" aria-hidden="true">
@@ -196,7 +198,7 @@ function Painel({
         {marcos.map((m) => (
           <g key={m.t}>
             <line x1={x(m.t)} x2={x(m.t)} y1={MARGEM.topo} y2={MARGEM.topo + h} stroke={COR.eixo} strokeWidth="1" />
-            <text x={x(m.t) + 4} y={MARGEM.topo + 10} fontSize="10" fill="#cbd5e1">{m.texto}</text>
+            <text x={x(m.t) + 4} y={MARGEM.topo + 10} fontSize="10" fill={COR.cursor}>{m.texto}</text>
           </g>
         ))}
         {series.map((s) => (
@@ -207,7 +209,7 @@ function Painel({
             ) : null}
             {s.forma === "pontos" &&
               s.pontos.map((p) => p.v !== null && (
-                <circle key={p.t} cx={x(p.t)} cy={y(p.v)} r="4" fill={s.cor} stroke="#0f172a" strokeWidth="2" />
+                <circle key={p.t} cx={x(p.t)} cy={y(p.v)} r="4" fill={s.cor} stroke={COR.superficie} strokeWidth="2" />
               ))}
           </g>
         ))}
@@ -218,9 +220,9 @@ function Painel({
         )}
         {cursorX !== null && (
           <g pointerEvents="none">
-            <line x1={cursorX} x2={cursorX} y1={MARGEM.topo} y2={MARGEM.topo + h} stroke="#cbd5e1" strokeWidth="1" />
+            <line x1={cursorX} x2={cursorX} y1={MARGEM.topo} y2={MARGEM.topo + h} stroke={COR.cursor} strokeWidth="1" />
             {leitura.map(({ s, p }) => p && p.v !== null && (
-              <circle key={s.nome} cx={x(p.t)} cy={y(p.v)} r="4.5" fill={s.cor} stroke="#0f172a" strokeWidth="2" />
+              <circle key={s.nome} cx={x(p.t)} cy={y(p.v)} r="4.5" fill={s.cor} stroke={COR.superficie} strokeWidth="2" />
             ))}
           </g>
         )}
@@ -234,17 +236,17 @@ function Painel({
       </svg>
       {cursorX !== null && cursor !== null && leitura.some(({ p }) => p) && (
         <div
-          className="pointer-events-none absolute z-10 min-w-[150px] rounded-lg border border-slate-700 bg-slate-950/95 px-3 py-2 shadow-xl"
+          className="pointer-events-none absolute z-10 min-w-[150px] rounded-lg border border-mata-700 bg-mata-950/95 px-3 py-2 shadow-xl"
           style={{ top: 28, ...(tooltipEsquerda ? { right: largura - cursorX + 10 } : { left: cursorX + 10 }) }}
         >
-          <div className="mb-1 text-[11px] text-slate-400">{rotuloTempo(cursor, true)}</div>
+          <div className="mb-1 text-[11px] text-mata-400">{rotuloTempo(cursor, true)}</div>
           {leitura.map(({ s, p }) => (
             <div key={s.nome} className="flex items-center gap-2 text-xs">
               <svg width="12" height="6" aria-hidden="true">
                 <line x1="1" y1="3" x2="11" y2="3" stroke={s.cor} strokeWidth="2" strokeDasharray={s.tracejado ? "3 2" : undefined} />
               </svg>
-              <span className="font-mono font-bold text-slate-100">{p && p.v !== null ? `${fmt(p.v, s.casas)} ${s.unidade}` : "–"}</span>
-              <span className="text-slate-400">{s.nome}</span>
+              <span className="font-mono font-bold text-mata-100">{p && p.v !== null ? `${fmt(p.v, s.casas)} ${s.unidade}` : "–"}</span>
+              <span className="text-mata-400">{s.nome}</span>
             </div>
           ))}
         </div>
@@ -256,10 +258,10 @@ function Painel({
 // ------------------------------------------------------------------ indicadores
 function Indicador({ rotulo, valor, detalhe }: { rotulo: string; valor: string; detalhe?: string }) {
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-2">
-      <div className="text-[10px] font-bold uppercase text-slate-500">{rotulo}</div>
-      <div className="text-xl font-bold text-slate-100">{valor}</div>
-      {detalhe && <div className="text-[11px] text-slate-500">{detalhe}</div>}
+    <div className="rounded-lg border border-mata-800 bg-mata-900/60 px-3 py-2">
+      <div className="text-[10px] font-bold uppercase text-mata-500">{rotulo}</div>
+      <div className="text-xl font-bold text-mata-100">{valor}</div>
+      {detalhe && <div className="text-[11px] text-mata-500">{detalhe}</div>}
     </div>
   );
 }
@@ -354,32 +356,32 @@ export function GraficosFornos() {
   const comparar = pm && pm.linha_base.n > 0 && pm.conselheiro.n > 0;
 
   return (
-    <section className="mb-8 rounded-xl border border-slate-800 bg-[#0f172a] p-4 shadow-2xl">
+    <section className="mb-8 rounded-xl border border-mata-800 bg-mata-925 p-4 shadow-2xl">
       {/* filtros: uma linha, acima de tudo */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="flex rounded-lg border border-slate-700 p-0.5">
+        <div className="flex rounded-lg border border-mata-700 p-0.5">
           {FORNOS.map((f) => (
             <button key={f} type="button" onClick={() => setForno(f)}
-              className={`rounded-md px-3 py-1.5 text-sm font-bold ${forno === f ? "bg-emerald-500/15 text-emerald-400" : "text-slate-400 hover:text-slate-200"}`}>
+              className={`rounded-md px-3 py-1.5 text-sm font-bold ${forno === f ? "bg-marca-500/15 text-marca-400" : "text-mata-400 hover:text-mata-200"}`}>
               {f}
             </button>
           ))}
         </div>
-        <div className="flex rounded-lg border border-slate-700 p-0.5">
+        <div className="flex rounded-lg border border-mata-700 p-0.5">
           {PERIODOS.map((p) => (
             <button key={p.horas} type="button" onClick={() => setHoras(p.horas)}
-              className={`rounded-md px-3 py-1.5 text-sm ${horas === p.horas ? "bg-slate-700 font-bold text-slate-100" : "text-slate-400 hover:text-slate-200"}`}>
+              className={`rounded-md px-3 py-1.5 text-sm ${horas === p.horas ? "bg-mata-700 font-bold text-mata-100" : "text-mata-400 hover:text-mata-200"}`}>
               {p.rotulo}
             </button>
           ))}
         </div>
         <button type="button" onClick={() => setVerTabela((v) => !v)}
-          className="ml-auto rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-400 hover:text-slate-200">
+          className="ml-auto rounded-lg border border-mata-700 px-3 py-1.5 text-sm text-mata-400 hover:text-mata-200">
           {verTabela ? "Ver gráficos" : "Ver tabela"}
         </button>
       </div>
 
-      {erro && !dados && <p className="py-10 text-center text-sm text-slate-500">Gráficos indisponíveis ({erro}).</p>}
+      {erro && !dados && <p className="py-10 text-center text-sm text-mata-500">Gráficos indisponíveis ({erro}).</p>}
 
       {r && (
         <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-5">
@@ -391,8 +393,8 @@ export function GraficosFornos() {
         </div>
       )}
       {comparar && pm && (
-        <div className="mb-4 rounded-lg border border-emerald-800/50 bg-emerald-500/5 px-3 py-2 text-sm text-slate-300">
-          <span className="font-bold text-slate-100">Antes × depois neste período:</span>{" "}
+        <div className="mb-4 rounded-lg border border-marca-800/50 bg-marca-500/5 px-3 py-2 text-sm text-mata-300">
+          <span className="font-bold text-mata-100">Antes × depois neste período:</span>{" "}
           dentro da faixa {fmt(pm.linha_base.dentro_faixa_pct, 0)}% → {fmt(pm.conselheiro.dentro_faixa_pct, 0)}% · variação ±{" "}
           {fmt(pm.linha_base.desvio, 2)} → ± {fmt(pm.conselheiro.desvio, 2)}
         </div>
@@ -417,16 +419,16 @@ export function GraficosFornos() {
                 largura={largura} cursor={cursor} setCursor={setCursor} mostrarEixoX marcos={graf.marcos} />
             )}
             {!graf.temSaida && (
-              <p className="text-[11px] text-slate-500">
+              <p className="text-[11px] text-mata-500">
                 Temperatura de saída do produto: aparece aqui assim que o PT100 for ligado ao CLP.
               </p>
             )}
           </div>
         )}
         {dados && verTabela && (
-          <div className="max-h-[480px] overflow-auto rounded-lg border border-slate-800">
+          <div className="max-h-[480px] overflow-auto rounded-lg border border-mata-800">
             <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-slate-950 text-left text-[11px] uppercase text-slate-500">
+              <thead className="sticky top-0 bg-mata-950 text-left text-[11px] uppercase text-mata-500">
                 <tr>
                   <th className="px-3 py-2">Data/hora</th>
                   <th className="px-3 py-2 text-right">Umidade</th>
@@ -439,17 +441,17 @@ export function GraficosFornos() {
                 {[...dados.amostras].reverse().map((a) => {
                   const dif = a.umidade_alvo === null ? null : a.umidade - a.umidade_alvo;
                   return (
-                    <tr key={a.t} className="border-t border-slate-800 text-slate-300">
-                      <td className="px-3 py-1.5 text-slate-400">{rotuloTempo(a.t, true)}</td>
+                    <tr key={a.t} className="border-t border-mata-800 text-mata-300">
+                      <td className="px-3 py-1.5 text-mata-400">{rotuloTempo(a.t, true)}</td>
                       <td className="px-3 py-1.5 text-right font-mono font-bold">{fmt(a.umidade)}%</td>
                       <td className="px-3 py-1.5 text-right font-mono">{fmt(a.umidade_alvo)}%</td>
                       <td className="px-3 py-1.5 text-right font-mono">{dif === null ? "–" : `${dif > 0 ? "+" : ""}${fmt(dif)}`}</td>
-                      <td className="px-3 py-1.5 text-slate-400">{a.responsavel || "–"}</td>
+                      <td className="px-3 py-1.5 text-mata-400">{a.responsavel || "–"}</td>
                     </tr>
                   );
                 })}
                 {dados.amostras.length === 0 && (
-                  <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-500">Nenhuma amostra no período.</td></tr>
+                  <tr><td colSpan={5} className="px-3 py-6 text-center text-mata-500">Nenhuma amostra no período.</td></tr>
                 )}
               </tbody>
             </table>

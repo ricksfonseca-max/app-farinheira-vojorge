@@ -10,10 +10,10 @@ const CHAVE_USUARIO = "umidade_supervisor";
 const ESTILO_ACAO: Record<string, { caixa: string; texto: string }> = {
   reduzir: { caixa: "border-amber-500/60 bg-amber-500/10", texto: "text-amber-400" },
   aumentar: { caixa: "border-sky-500/60 bg-sky-500/10", texto: "text-sky-400" },
-  manter: { caixa: "border-emerald-500/50 bg-emerald-500/10", texto: "text-emerald-400" },
+  manter: { caixa: "border-marca-500/50 bg-marca-500/10", texto: "text-marca-400" },
   amostra_invalida: { caixa: "border-rose-500/60 bg-rose-500/10", texto: "text-rose-400" },
 };
-const ESTILO_NEUTRO = { caixa: "border-slate-700 bg-slate-800/40", texto: "text-slate-400" };
+const ESTILO_NEUTRO = { caixa: "border-mata-700 bg-mata-800/40", texto: "text-mata-400" };
 
 function lerUsuario() {
   try { return localStorage.getItem(CHAVE_USUARIO) || ""; } catch { return ""; }
@@ -73,11 +73,11 @@ function ModalSupervisor({
       <form
         onSubmit={enviar}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-xl border border-slate-700 bg-[#0f172a] p-5 shadow-2xl"
+        className="w-full max-w-sm rounded-xl border border-mata-700 bg-mata-925 p-5 shadow-2xl"
       >
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-base font-bold text-slate-100">{titulo}</h3>
-          <button type="button" onClick={aoFechar} className="text-slate-500 hover:text-slate-300" aria-label="Fechar">
+          <h3 className="text-base font-bold text-mata-100">{titulo}</h3>
+          <button type="button" onClick={aoFechar} className="text-mata-500 hover:text-mata-300" aria-label="Fechar">
             <X size={18} />
           </button>
         </div>
@@ -97,13 +97,13 @@ function ModalSupervisor({
           {erro && <p className="text-sm font-medium text-rose-400">{erro}</p>}
         </div>
         <div className="mt-5 flex justify-end gap-2">
-          <button type="button" onClick={aoFechar} className="rounded-lg px-4 py-2 text-sm text-slate-400 hover:bg-slate-800">
+          <button type="button" onClick={aoFechar} className="rounded-lg px-4 py-2 text-sm text-mata-400 hover:bg-mata-800">
             Cancelar
           </button>
           <button
             type="submit"
             disabled={enviando}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-500 disabled:opacity-50"
+            className="rounded-lg bg-marca-600 px-4 py-2 text-sm font-bold text-white hover:bg-marca-500 disabled:opacity-50"
           >
             {enviando ? "Salvando..." : textoConfirmar}
           </button>
@@ -114,12 +114,12 @@ function ModalSupervisor({
 }
 
 const CLASSE_INPUT =
-  "h-10 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 text-slate-100 outline-none focus:border-emerald-500";
+  "h-10 w-full rounded-lg border border-mata-700 bg-mata-900 px-3 text-mata-100 outline-none focus:border-marca-500";
 
 function Campo({ rotulo, children }: { rotulo: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[11px] font-bold uppercase text-slate-500">{rotulo}</span>
+      <span className="mb-1 block text-[11px] font-bold uppercase text-mata-500">{rotulo}</span>
       {children}
     </label>
   );
@@ -130,15 +130,15 @@ function Medida({
   icone, rotulo, valor, detalhe, cor, acao,
 }: { icone: ReactNode; rotulo: string; valor: string; detalhe?: string; cor: string; acao?: ReactNode }) {
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-2">
+    <div className="rounded-lg border border-mata-800 bg-mata-900/60 p-2">
       <div className="flex items-center justify-between gap-1">
-        <div className="flex items-center gap-1 text-[10px] font-bold uppercase text-slate-500">
+        <div className="flex items-center gap-1 text-[10px] font-bold uppercase text-mata-500">
           {icone} {rotulo}
         </div>
         {acao}
       </div>
       <div className={`font-mono text-lg font-bold ${cor}`}>{valor}</div>
-      {detalhe && <div className="font-mono text-[11px] text-slate-500">{detalhe}</div>}
+      {detalhe && <div className="font-mono text-[11px] text-mata-500">{detalhe}</div>}
     </div>
   );
 }
@@ -154,7 +154,7 @@ function CartaoForno({
   const faixa = f.parametros.faixa_qualidade ?? f.parametros.banda_morta;
   const umid = f.ultima_amostra?.umidade ?? null;
   const corUmid =
-    umid === null ? "text-slate-500" : Math.abs(umid - alvo) <= faixa ? "text-emerald-400" : umid > alvo ? "text-amber-400" : "text-sky-400";
+    umid === null ? "text-mata-500" : Math.abs(umid - alvo) <= faixa ? "text-marca-400" : umid > alvo ? "text-amber-400" : "text-sky-400";
   const falta = minutosAte(f.proxima_amostra_em, agora);
   const idadeLeitura = f.leitura ? Math.round((agora - new Date(f.leitura.lido_em).getTime()) / 1000) : null;
   const Icone = s.acao === "reduzir" ? ArrowDown : s.acao === "aumentar" ? ArrowUp : Minus;
@@ -168,12 +168,12 @@ function CartaoForno({
   };
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-[#0f172a] p-4 shadow-2xl">
+    <div className="rounded-xl border border-mata-800 bg-mata-925 p-4 shadow-2xl">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-lg font-black uppercase tracking-tight text-slate-100">{f.forno}</h3>
+        <h3 className="text-lg font-black uppercase tracking-tight text-mata-100">{f.forno}</h3>
         <span
           className={`rounded px-2 py-0.5 font-mono text-[11px] font-bold ${
-            f.leitura?.rodando ? "bg-emerald-500/15 text-emerald-400" : "bg-slate-800 text-slate-500"
+            f.leitura?.rodando ? "bg-marca-500/15 text-marca-400" : "bg-mata-800 text-mata-500"
           }`}
         >
           {f.leitura ? (f.leitura.rodando ? "GIRANDO" : "PARADO") : "SEM LEITURA"}
@@ -182,7 +182,7 @@ function CartaoForno({
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        <Medida icone={<Gauge size={14} />} rotulo="Rotação" valor={`${fmt(f.leitura?.velocidade_hz)} Hz`} cor="text-slate-100" />
+        <Medida icone={<Gauge size={14} />} rotulo="Rotação" valor={`${fmt(f.leitura?.velocidade_hz)} Hz`} cor="text-mata-100" />
         <Medida
           icone={<Flame size={14} />}
           rotulo="Vapor"
@@ -195,7 +195,7 @@ function CartaoForno({
           rotulo="Saída produto"
           valor={tempSaida === null ? "–" : `${fmt(tempSaida)} °C`}
           detalhe={tempSaida === null ? "PT100 a instalar" : "PT100"}
-          cor={tempSaida === null ? "text-slate-600" : "text-rose-300"}
+          cor={tempSaida === null ? "text-mata-600" : "text-rose-300"}
         />
         <Medida
           icone={<Droplets size={14} />}
@@ -209,12 +209,12 @@ function CartaoForno({
           rotulo="Setpoint"
           valor={`${fmt(alvo)}%`}
           detalhe={`± ${fmt(faixa)}${f.setpoint.alterado_por ? ` · ${f.setpoint.alterado_por}` : ""}`}
-          cor="text-slate-100"
+          cor="text-mata-100"
           acao={
             <button
               type="button"
               onClick={() => { setNovoSp(String(alvo).replace(".", ",")); setEditando(true); }}
-              className="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-emerald-400"
+              className="rounded p-1 text-mata-500 hover:bg-mata-800 hover:text-marca-400"
               aria-label={`Alterar setpoint do ${f.forno}`}
               title="Alterar setpoint"
             >
@@ -226,13 +226,13 @@ function CartaoForno({
           icone={<Timer size={14} />}
           rotulo="Próxima amostra"
           valor={falta === null ? "agora" : falta <= 0 ? "AGORA" : `${falta} min`}
-          cor={falta !== null && falta <= 0 ? "text-rose-400 animate-pulse" : "text-slate-100"}
+          cor={falta !== null && falta <= 0 ? "text-rose-400 animate-pulse" : "text-mata-100"}
         />
       </div>
 
       {modo === "linha_base" ? (
-        <div className="mt-3 rounded-lg border border-dashed border-slate-700 bg-slate-900/40 p-3 text-sm text-slate-400">
-          <span className="font-bold text-slate-300">Registrando a linha de base.</span> Opere o forno como de
+        <div className="mt-3 rounded-lg border border-dashed border-mata-700 bg-mata-900/40 p-3 text-sm text-mata-400">
+          <span className="font-bold text-mata-300">Registrando a linha de base.</span> Opere o forno como de
           costume: as sugestões ficam ocultas até o comparativo "antes" estar completo.
         </div>
       ) : (
@@ -246,7 +246,7 @@ function CartaoForno({
               <div className="text-right">
                 <div className={`font-mono text-2xl font-black ${estilo.texto}`}>{fmt(s.velocidade_sugerida_hz)} Hz</div>
                 {s.delta_hz !== null && Math.abs(s.delta_hz) >= 0.05 && (
-                  <div className="font-mono text-xs text-slate-400">
+                  <div className="font-mono text-xs text-mata-400">
                     {s.delta_hz > 0 ? "+" : ""}
                     {fmt(s.delta_hz)} Hz
                   </div>
@@ -254,7 +254,7 @@ function CartaoForno({
               </div>
             )}
           </div>
-          <p className="mt-2 text-sm leading-snug text-slate-300">{s.motivo}</p>
+          <p className="mt-2 text-sm leading-snug text-mata-300">{s.motivo}</p>
           {s.avisos?.length > 0 && (
             <ul className="mt-2 space-y-1">
               {s.avisos.map((a) => (
@@ -267,7 +267,7 @@ function CartaoForno({
         </div>
       )}
 
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-mata-500">
         <span>{modo === "linha_base" ? "Nada é enviado ao CLP." : "Modo conselheiro: ajuste a rotação na IHM."}</span>
         <span title={f.modelo.motivo}>
           K {fmt(s.ganho_k, 2)} %/Hz
@@ -324,7 +324,7 @@ export function PainelFornos({ atualizar = 0 }: { atualizar?: number }) {
 
   if (!estado) {
     return (
-      <div className="mb-6 rounded-xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-500">
+      <div className="mb-6 rounded-xl border border-mata-800 bg-mata-900 p-4 text-sm text-mata-500">
         {erro ? `Controle de umidade indisponível (${erro}).` : "Carregando fornos..."}
       </div>
     );
@@ -337,15 +337,15 @@ export function PainelFornos({ atualizar = 0 }: { atualizar?: number }) {
     <section className="mb-6">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-3">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400">Controle de umidade · fornos</h2>
+          <h2 className="text-sm font-bold uppercase tracking-widest text-mata-400">Controle de umidade · fornos</h2>
           <button
             type="button"
             onClick={() => setTrocandoModo(true)}
             title="Alterar modo de operação"
             className={`rounded-full border px-3 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
               modo === "linha_base"
-                ? "border-slate-600 bg-slate-800 text-slate-300 hover:border-slate-400"
-                : "border-emerald-600/60 bg-emerald-500/10 text-emerald-400 hover:border-emerald-400"
+                ? "border-mata-600 bg-mata-800 text-mata-300 hover:border-mata-400"
+                : "border-marca-600/60 bg-marca-500/10 text-marca-400 hover:border-marca-400"
             }`}
           >
             {modo === "linha_base" ? "● " : "◆ "}
@@ -359,10 +359,10 @@ export function PainelFornos({ atualizar = 0 }: { atualizar?: number }) {
               <AlertTriangle size={13} /> {erro ? "serviço sem resposta" : "falha na leitura do CLP"}
             </span>
           )}
-          <a href={umidadeApi.urlExportar("amostras")} className="flex items-center gap-1 text-slate-500 hover:text-emerald-400">
+          <a href={umidadeApi.urlExportar("amostras")} className="flex items-center gap-1 text-mata-500 hover:text-marca-400">
             <Download size={13} /> amostras
           </a>
-          <a href={umidadeApi.urlExportar("sugestoes")} className="flex items-center gap-1 text-slate-500 hover:text-emerald-400">
+          <a href={umidadeApi.urlExportar("sugestoes")} className="flex items-center gap-1 text-mata-500 hover:text-marca-400">
             <Download size={13} /> sugestões
           </a>
         </div>
@@ -384,7 +384,7 @@ export function PainelFornos({ atualizar = 0 }: { atualizar?: number }) {
           }}
           textoConfirmar={`Mudar para ${TEXTO_MODO[outroModo]}`}
         >
-          <p className="text-sm leading-snug text-slate-400">
+          <p className="text-sm leading-snug text-mata-400">
             {outroModo === "conselheiro"
               ? "Os operadores passam a ver a rotação sugerida. A data de hoje marca o fim do período \"antes\" no comparativo."
               : "As sugestões ficam ocultas e os dados voltam a contar como linha de base (\"antes\")."}
