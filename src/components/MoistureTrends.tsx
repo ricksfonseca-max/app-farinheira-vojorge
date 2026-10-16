@@ -12,8 +12,8 @@ export function MoistureTrends({ records }: { records: any[] }) {
 
   if (!records || records.length === 0) {
     return (
-      <Card className="shadow-2xl border-t-4 border-t-emerald-500 bg-[#0f172a] border-slate-800">
-        <div className="p-16 text-center text-slate-500 font-medium">Aguardando telemetria...</div>
+      <Card className="shadow-2xl border-t-4 border-t-marca-500 bg-mata-925 border-mata-800">
+        <div className="p-16 text-center text-mata-500 font-medium">Aguardando telemetria...</div>
       </Card>
     );
   }
@@ -36,30 +36,30 @@ export function MoistureTrends({ records }: { records: any[] }) {
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-slate-900/95 backdrop-blur-md p-4 border border-slate-700 rounded-lg shadow-2xl z-50 text-slate-200">
-          <p className="font-bold text-slate-300 border-b border-slate-700 pb-2 mb-2">⏱ {label}</p>
+        <div className="bg-mata-900/95 backdrop-blur-md p-4 border border-mata-700 rounded-lg shadow-2xl z-50 text-mata-200">
+          <p className="font-bold text-mata-300 border-b border-mata-700 pb-2 mb-2">⏱ {label}</p>
           <p className="text-cyan-400 font-bold">💧 Umidade: {payload[0].value}%</p>
           <p className="text-orange-400 font-bold">🔥 Pressão: {payload[1].value} Bar</p>
-          <p className="text-slate-400 text-sm mt-2 pt-2 border-t border-slate-700">👨‍🔧 Op: {payload[0].payload.Operador}</p>
+          <p className="text-mata-400 text-sm mt-2 pt-2 border-t border-mata-700">👨‍🔧 Op: {payload[0].payload.Operador}</p>
         </div>
       );
     } return null;
   };
 
   return (
-    <Card className="shadow-2xl border-t-4 border-t-emerald-500 bg-[#0f172a] border-slate-800">
-      <CardHeader className="border-b border-slate-800/50 pb-4 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-        <CardTitle className="text-xl text-slate-100 flex items-center gap-2">
-          <Activity className="h-6 w-6 text-emerald-500" /> Telemetria de Secagem
+    <Card className="shadow-2xl border-t-4 border-t-marca-500 bg-mata-925 border-mata-800">
+      <CardHeader className="border-b border-mata-800/50 pb-4 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+        <CardTitle className="text-xl text-mata-100 flex items-center gap-2">
+          <Activity className="h-6 w-6 text-marca-500" /> Telemetria de Secagem
         </CardTitle>
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto bg-slate-900/50 p-2 rounded-xl border border-slate-800">
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto bg-mata-900/50 p-2 rounded-xl border border-mata-800">
           <div className="flex items-center gap-2 w-full sm:w-auto px-2">
-            <span className="text-xs font-bold text-slate-400 uppercase">De:</span>
-            <Input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} className="h-10 w-full sm:w-[140px] text-sm bg-slate-900 text-slate-200 border-slate-700" />
+            <span className="text-xs font-bold text-mata-400 uppercase">De:</span>
+            <Input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} className="h-10 w-full sm:w-[140px] text-sm bg-mata-900 text-mata-200 border-mata-700" />
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto px-2">
-            <span className="text-xs font-bold text-slate-400 uppercase">Até:</span>
-            <Input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} className="h-10 w-full sm:w-[140px] text-sm bg-slate-900 text-slate-200 border-slate-700" />
+            <span className="text-xs font-bold text-mata-400 uppercase">Até:</span>
+            <Input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} className="h-10 w-full sm:w-[140px] text-sm bg-mata-900 text-mata-200 border-mata-700" />
           </div>
           {(dataInicio || dataFim) && (
             <Button variant="ghost" onClick={() => {setDataInicio(""); setDataFim("");}} className="h-10 text-rose-400 hover:text-rose-300 hover:bg-rose-950/30">
@@ -71,19 +71,19 @@ export function MoistureTrends({ records }: { records: any[] }) {
 
       <CardContent className="pt-6">
         {chartData.length === 0 ? (
-          <div className="h-[450px] w-full flex flex-col items-center justify-center text-slate-500 font-medium"><p className="text-4xl mb-4">📭</p><p>Nenhum registro encontrado.</p></div>
+          <div className="h-[450px] w-full flex flex-col items-center justify-center text-mata-500 font-medium"><p className="text-4xl mb-4">📭</p><p>Nenhum registro encontrado.</p></div>
         ) : (
           <div className="h-[450px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                <XAxis dataKey="horaExibicao" stroke="#64748b" fontSize={11} tickMargin={10} />
-                <YAxis yAxisId="left" stroke="#64748b" fontSize={11} tickFormatter={(val) => `${val}%`} />
-                <YAxis yAxisId="right" orientation="right" stroke="#64748b" fontSize={11} tickFormatter={(val) => `${val} Bar`} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#23352a" vertical={false} />
+                <XAxis dataKey="horaExibicao" stroke="#7d9584" fontSize={11} tickMargin={10} />
+                <YAxis yAxisId="left" stroke="#7d9584" fontSize={11} tickFormatter={(val) => `${val}%`} />
+                <YAxis yAxisId="right" orientation="right" stroke="#7d9584" fontSize={11} tickFormatter={(val) => `${val} Bar`} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ paddingTop: '20px' }} iconType="circle" />
-                <Line yAxisId="left" type="monotone" dataKey="Umidade" name="Umidade (%)" stroke="#22d3ee" strokeWidth={3} activeDot={{ r: 6, fill: '#22d3ee', stroke: '#0f172a' }} dot={false} />
-                <Line yAxisId="right" type="monotone" dataKey="Pressão" name="Pressão (Bar)" stroke="#fb923c" strokeWidth={3} activeDot={{ r: 6, fill: '#fb923c', stroke: '#0f172a' }} dot={false} />
+                <Line yAxisId="left" type="monotone" dataKey="Umidade" name="Umidade (%)" stroke="#22d3ee" strokeWidth={3} activeDot={{ r: 6, fill: '#22d3ee', stroke: '#10211a' }} dot={false} />
+                <Line yAxisId="right" type="monotone" dataKey="Pressão" name="Pressão (Bar)" stroke="#fb923c" strokeWidth={3} activeDot={{ r: 6, fill: '#fb923c', stroke: '#10211a' }} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>

@@ -1,0 +1,39 @@
+# App Farinheira + serviço de sugestão de rotação dos fornos.
+#   docker compose up -d --build
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    depends_on:
+      - servico-umidade
+    restart: unless-stopped
+
+  servico-umidade:
+    build: ./servico-umidade
+    environment:
+      # Endpoint do Node-RED com rotação e pressão dos dois fornos (fluxo em servico-umidade/nodered/)
+      FONTE_PROCESSO_URL: "http://192.168.10.201:1880/api/fornos"
+      # Opcional: importa apontamentos que não chegaram pelo app (ex.: http://192.168.10.201:1880/api/registros).
+      # Deixe vazio se /api/registros devolver as fotos (fica pesado a cada 5 min).
+      REGISTROS_URL: ""
+      INTERVALO_LEITURA_S: "15"
+      # Banco: SQLite no volume (padrão) ou MySQL: "mysql://umidade:SENHA@mysql:3306/controle_umidade"
+      BANCO: "/dados/umidade.db"
+      FUSO_HORARIO_PADRAO: "-03:00"
+      # Se definir, configure o mesmo valor em VITE_TOKEN_UMIDADE no build do app.
+      TOKEN_API: ""
+      # PIN pedido na tela para alterar setpoint e modo. TROQUE antes de subir.
+      SENHA_SUPERVISOR: "trocar-este-pin"
+      # Modo no primeiro start: linha_base (só registra, para o "antes") ou conselheiro
+      MODO_INICIAL: "linha_base"
+    volumes:
+      - dados-umidade:/dados
+      - ./servico-umidade/config/fornos.json:/app/config/fornos.json:ro
+    # Descomente para acessar a API direto pela rede local (exportar CSV, depurar):
+    # ports:
+    #   - "8000:8000"
+    restart: unless-stopped
+
+volumes:
+  dados-umidade:

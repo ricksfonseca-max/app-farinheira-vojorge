@@ -7,34 +7,34 @@
 @layer base {
   /* Substituímos o PADRÃO pelo MODO ESCURO. Agora o escuro é a lei! */
   :root {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 150 40% 6%;
+    --foreground: 140 25% 95%;
     
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 150 35% 10%;
+    --card-foreground: 140 25% 95%;
     
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 150 35% 10%;
+    --popover-foreground: 140 25% 95%;
     
-    /* COR VERDE INDUSTRIAL */
-    --primary: 142.1 76.2% 36.3%;
-    --primary-foreground: 210 40% 98%;
+    /* VERDE VÔ JORGE (logo) */
+    --primary: 149 92% 31%;
+    --primary-foreground: 0 0% 100%;
     
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 146 21% 17%;
+    --secondary-foreground: 140 25% 95%;
     
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 146 21% 17%;
+    --muted-foreground: 140 10% 62%;
     
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 146 21% 17%;
+    --accent-foreground: 140 25% 95%;
     
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 358 78% 51%;
+    --destructive-foreground: 0 0% 100%;
     
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 142.1 76.2% 36.3%;
+    --border: 146 21% 17%;
+    --input: 146 21% 17%;
+    --ring: 149 92% 31%;
     --radius: 0.75rem;
   }
 }

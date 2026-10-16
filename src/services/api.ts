@@ -20,7 +20,7 @@ export interface RegistroProducao {
 export const api = {
   salvar: async (dados: RegistroProducao) => {
     try {
-      const payloadCompleto = { ...dados, data_hora: new Date().toISOString() };
+      const payloadCompleto = { ...dados, data_hora: dados.data_hora ?? new Date().toISOString() };
       const res = await fetch(`${API_BASE}/registro-qualidade`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

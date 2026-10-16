@@ -32,12 +32,12 @@ export function AuthForm() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-mata-100 p-4">
       <div className="mb-8 flex flex-col items-center animate-in fade-in slide-in-from-top-4 duration-700">
         <div className="bg-green-700 p-4 rounded-2xl shadow-lg mb-4">
           <Factory className="h-10 w-10 text-white" />
         </div>
-        <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">
+        <h1 className="text-2xl font-black text-mata-800 uppercase tracking-tighter">
           Indústria Vô Jorge
         </h1>
         <p className="text-sm font-bold text-green-600 tracking-widest uppercase">
@@ -45,9 +45,9 @@ export function AuthForm() {
         </p>
       </div>
 
-      <Card className="w-full max-w-md shadow-2xl border-slate-200">
+      <Card className="w-full max-w-md shadow-2xl border-mata-200">
         <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold text-slate-800">
+          <CardTitle className="text-2xl font-bold text-mata-800">
             {isRegister ? "Criar Conta" : "Acessar Sistema"}
           </CardTitle>
           <CardDescription>
@@ -111,7 +111,7 @@ export function AuthForm() {
             <button
               type="button"
               onClick={() => setIsRegister(!isRegister)}
-              className="text-sm text-slate-500 hover:text-green-700 underline underline-offset-4 transition-colors"
+              className="text-sm text-mata-500 hover:text-green-700 underline underline-offset-4 transition-colors"
             >
               {isRegister 
                 ? "Já tem uma conta? Faça Login" 
