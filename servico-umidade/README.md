@@ -220,5 +220,5 @@ cd servico-umidade
 python -m unittest discover -s tests -t .
 ```
 
-São 68 testes (também rodam contra o MySQL real com `TEST_BANCO_URL`), incluindo rosca dosadora, setpoint, PIN, modo e indicadores por período: tabela de vapor, regras do modelo, simulação de forno (perturbação de massa,
+São 71 testes (também rodam contra o MySQL real com `TEST_BANCO_URL`), incluindo rosca dosadora, setpoint, PIN, modo e indicadores por período: tabela de vapor, regras do modelo, simulação de forno (perturbação de massa,
 queda de vapor, operador ignorando a sugestão), sincronização com o Node-RED e a API HTTP de ponta a ponta.

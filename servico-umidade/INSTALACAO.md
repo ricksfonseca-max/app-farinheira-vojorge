@@ -95,7 +95,7 @@ Para desfazer: `cp docker-compose.yml.bak-<data> docker-compose.yml`.
 cd ~/industria-v4 && docker compose build servico-umidade && \
 docker compose run --rm servico-umidade python -m unittest discover -s tests -t . 2>&1 | tail -4
 ```
-✅ `Ran 68 tests` e `OK`. Os testes usam o banco `controle_umidade_teste`; o banco de
+✅ `Ran 71 tests` e `OK`. Os testes usam o banco `controle_umidade_teste`; o banco de
 produção não é tocado.
 
 ## Etapa 5 · Subir

@@ -7,12 +7,31 @@ import os
 import signal
 import sys
 import threading
+from urllib.parse import urlparse, urlunparse
 
 from .banco import Banco
 from .coletor import Coletor
 from .config import ConfigServico, carregar_fornos
 from .servico import ServicoUmidade
 from .servidor import criar_servidor
+
+
+def preparar_destino(destino: str) -> None:
+    """Cria a pasta do arquivo SQLite. Para MySQL (ou banco em memória) não há nada a criar."""
+    if "://" in destino or destino == ":memory:":
+        return
+    os.makedirs(os.path.dirname(os.path.abspath(destino)), exist_ok=True)
+
+
+def ocultar_senha(url: str) -> str:
+    """mysql://u:segredo@h/db -> mysql://u:***@h/db (para não vazar senha no log)."""
+    if not url or "://" not in url:
+        return url or "-"
+    u = urlparse(url)
+    if not u.password:
+        return url
+    netloc = f"{u.username or ''}:***@{u.hostname}" + (f":{u.port}" if u.port else "")
+    return urlunparse(u._replace(netloc=netloc))
 
 
 def main() -> int:
@@ -23,7 +42,7 @@ def main() -> int:
     log = logging.getLogger("servico-umidade")
     cfg = ConfigServico.do_ambiente()
     fornos = carregar_fornos(cfg.config_fornos)
-    os.makedirs(os.path.dirname(os.path.abspath(cfg.banco)), exist_ok=True)
+    preparar_destino(cfg.banco)
     banco = Banco(cfg.banco)
     servico = ServicoUmidade(cfg, fornos, banco)
     coletor = Coletor(servico)
@@ -37,7 +56,8 @@ def main() -> int:
     signal.signal(signal.SIGINT, encerrar)
 
     log.info("Fornos: %s | processo: %s | registros: %s | banco: %s",
-             ", ".join(fornos), cfg.fonte_processo_url or "-", cfg.registros_url or "-", cfg.banco)
+             ", ".join(fornos), ocultar_senha(cfg.fonte_processo_url), ocultar_senha(cfg.registros_url),
+             ocultar_senha(cfg.banco))
     coletor.iniciar()
     log.info("API ouvindo na porta %d", cfg.porta)
     try:
