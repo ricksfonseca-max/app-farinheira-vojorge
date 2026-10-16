@@ -14,6 +14,10 @@ class ParametrosForno:
     """Parâmetros do modelo para um forno. Todos podem ser ajustados no fornos.json."""
 
     nome: str
+    # Variável que o sistema sugere ajustar: "alimentacao" (rosca dosadora) ou "rotacao" (do forno).
+    # Os limites f_min_hz / f_max_hz / passo_max_hz valem para ela.
+    manipulada: str = "rotacao"
+    rotacao_ref_hz: float = 40.0        # rotação de referência do forno (normaliza a carga)
     umidade_alvo: float = 12.0          # % de umidade desejada na saída
     f_min_hz: float = 20.0              # rotação mínima permitida para sugestão
     f_max_hz: float = 60.0              # rotação máxima permitida para sugestão
@@ -68,6 +72,10 @@ def _filtrar(d: dict) -> dict:
 
 def _validar(p: ParametrosForno) -> None:
     erros = []
+    if p.manipulada not in ("alimentacao", "rotacao"):
+        erros.append('manipulada deve ser "alimentacao" ou "rotacao"')
+    if p.rotacao_ref_hz <= 0:
+        erros.append("rotacao_ref_hz deve ser positiva")
     if not (0 < p.f_min_hz < p.f_max_hz):
         erros.append("f_min_hz deve ser > 0 e menor que f_max_hz")
     if p.ganho_k <= 0:

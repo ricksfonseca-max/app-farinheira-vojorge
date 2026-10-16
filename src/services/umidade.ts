@@ -14,6 +14,7 @@ export type AcaoSugestao =
   | "amostra_antiga";
 
 export type Modo = "linha_base" | "conselheiro";
+export type Manipulada = "alimentacao" | "rotacao";
 
 export interface Sugestao {
   forno: string;
@@ -21,6 +22,7 @@ export interface Sugestao {
   origem: "amostra" | "vapor" | "setpoint";
   acao: AcaoSugestao;
   motivo: string;
+  variavel: Manipulada; // a qual variável os campos *_hz se referem
   velocidade_atual_hz: number | null;
   velocidade_sugerida_hz: number | null;
   pressao_bar: number | null;
@@ -42,6 +44,7 @@ export interface EstadoForno {
     pressao_bar: number | null;
     tsat_c: number | null;
     temp_saida_c: number | null; // PT100 na saída do produto (null até instalar)
+    alimentacao_hz: number | null; // rosca dosadora
     rodando: boolean;
     lido_em: string;
   } | null;
@@ -63,6 +66,8 @@ export interface EstadoForno {
     umidade_alvo: number;
     banda_morta: number;
     faixa_qualidade: number;
+    manipulada: Manipulada;
+    nome_manipulada: string;
     f_min_hz: number;
     f_max_hz: number;
     setpoint_min: number;
@@ -128,7 +133,11 @@ export interface Series {
   fim: number;
   passo_min: number;
   faixa_qualidade: number;
-  leituras: { t: number; velocidade_hz: number | null; pressao_bar: number | null; tsat_c: number | null; temp_saida_c: number | null; rodando: boolean }[];
+  variavel: Manipulada;
+  leituras: {
+    t: number; velocidade_hz: number | null; alimentacao_hz: number | null; pressao_bar: number | null;
+    tsat_c: number | null; temp_saida_c: number | null; rodando: boolean;
+  }[];
   amostras: { t: number; umidade: number; umidade_alvo: number | null; responsavel: string | null; tipo_farinha: string | null; origem: string }[];
   sugestoes: { t: number; velocidade_sugerida_hz: number | null; acao: AcaoSugestao; origem: string; aplicada: number | null; modo: Modo | null }[];
   setpoints: { t: number; umidade_alvo: number; alterado_por: string | null }[];

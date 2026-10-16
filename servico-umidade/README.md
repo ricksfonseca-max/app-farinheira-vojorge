@@ -1,8 +1,11 @@
 # Serviço de sugestão de rotação dos fornos
 
-Serviço Python (Docker) que lê a **rotação** e a **pressão do vapor** dos dois fornos
-rotativos, recebe a **umidade** apontada pelo operador no app Farinheira (a cada ~20 min) e
-**sugere a rotação** de cada forno. Ele grava tudo em banco para avaliar o modelo ao fim do mês.
+Serviço Python (Docker) que lê a **rosca dosadora**, a **rotação** e a **pressão do vapor** dos
+dois fornos rotativos, recebe a **umidade** apontada pelo operador no app Farinheira (a cada
+~20 min) e **sugere o ajuste** de cada forno. Por padrão o ajuste sugerido é o da **rosca
+dosadora**, que é o que os operadores mexem no dia a dia; a rotação do forno entra como
+perturbação medida. Isso é configurável por forno (`manipulada`). O serviço grava tudo em banco
+para avaliar o modelo ao fim do mês.
 
 > **O serviço não escreve nada no CLP.** Ele tem dois modos, trocados na tela com PIN de supervisor:
 >
@@ -26,13 +29,18 @@ Usa apenas a biblioteca padrão do Python, sem `pip install`. A imagem é pequen
 
 ## 1. Como o modelo calcula
 
-**Tempo de residência ∝ 1 / rotação** (mais rápido = sai mais úmida) e
-**taxa de secagem ∝ (T_vapor − T_massa)** (vapor mais frio = seca menos).
+- **taxa de secagem ∝ (T_vapor − T_massa)**: vapor mais frio seca menos;
+- **tempo de residência ∝ 1 / rotação**: forno mais rápido, farinha mais úmida;
+- **água a evaporar ∝ alimentação**: mais massa entrando, farinha mais úmida.
+
+A variável manipulada (VM) é a rosca (`manipulada: "alimentacao"`) ou a rotação (`"rotacao"`).
+Com a rosca, o fator do passo 2 também inclui a rotação: `fator = fator_vapor × rotacao_ref / rotação`.
+Assim, se o operador acelerar o forno, o sistema sugere reduzir a rosca na hora.
 
 1. **Temperatura do vapor:** pressão do manômetro + 1,013 bar → tabela de vapor saturado.
    Exemplos: 7 bar = 170 °C, 8 bar = 175 °C.
 2. **Fator de vapor:** `fator = (Tsat − 100) / (Tsat_ref − 100)`, que vale 1,0 com o vapor de referência (175 °C).
-3. **Rotação base:** `base = rotação / fator`, ou seja, a rotação equivalente com o vapor de referência.
+3. **Carga base:** `base = VM / fator`, ou seja, o valor equivalente da VM nas condições de referência.
 4. **Amostra de umidade:** o serviço calcula a **base média enquanto aquela massa estava no forno**
    (janela de `t_residencia_min`, terminando `t_coleta_min` antes da coleta) e corrige:
 
@@ -84,10 +92,12 @@ Com a massa de entrada 1,5 ponto mais úmida, a umidade volta para dentro da ban
    | %MW101 | Rotação forno 2 em Hz × 10 |
    | %MW102 | Pressão do vapor em bar × 10 (manométrica) |
    | %MW103 | bit0 = forno 1 girando, bit1 = forno 2 girando |
-   | %MW104 | (futuro) PT100 saída do produto forno 1 em °C × 10 |
-   | %MW105 | (futuro) PT100 saída do produto forno 2 em °C × 10 |
+   | %MW104 | Rosca dosadora forno 1 em Hz × 10 (frequência de saída do inversor) |
+   | %MW105 | Rosca dosadora forno 2 em Hz × 10 |
+   | %MW106 | (futuro) PT100 saída do produto forno 1 em °C × 10 |
+   | %MW107 | (futuro) PT100 saída do produto forno 2 em °C × 10 |
 
-   Enquanto o PT100 não existir, deixe a leitura com 4 registradores: o campo aparece como
+   Enquanto o PT100 não existir, deixe a leitura com 6 registradores: o campo aparece como
    "PT100 a instalar" e o gráfico da saída do produto fica oculto. A temperatura já é gravada
    em `leituras.temp_saida_c` e em cada amostra, pronta para virar a malha rápida (cascata) depois.
 
@@ -146,15 +156,17 @@ na rede do Docker. Os dois containers precisam estar no mesmo compose ou na mesm
 
 | Parâmetro | Padrão | O que é |
 |---|---|---|
+| `manipulada` | alimentacao | O que o sistema sugere ajustar: `alimentacao` (rosca) ou `rotacao` (forno) |
+| `rotacao_ref_hz` | 40 | Rotação habitual do forno. Ajuste para o valor normal de cada forno |
 | `umidade_alvo` | 12,0 | Setpoint inicial (%). Depois, quem manda é o setpoint alterado na tela (com histórico) |
 | `faixa_qualidade` | 0,5 | ± em torno do setpoint considerado "dentro" nos indicadores e gráficos |
 | `setpoint_min` / `setpoint_max` | 5 / 20 | Faixa permitida para o setpoint digitado na tela |
 | `banda_morta` | 0,3 | Erro (%) que não gera correção |
-| `ganho_k` | 0,5 | % de umidade por Hz. **O mais importante: levantar nos dados (seção 3)** |
+| `ganho_k` | 0,5 | % de umidade por Hz da VM. **O mais importante: levantar nos dados (seção 3)** |
 | `alfa` | 0,5 | Fração do erro corrigida por amostra (0,3 conservador … 1,0 agressivo) |
 | `passo_max_hz` | 2,0 | Correção máxima por amostra |
-| `f_min_hz` / `f_max_hz` | 20 / 60 | Faixa permitida para sugestão |
-| `t_residencia_min` | 30 | Tempo da massa do início ao fim do forno. **Medir** |
+| `f_min_hz` / `f_max_hz` | 10 / 60 | Faixa permitida para a VM sugerida |
+| `t_residencia_min` | 20 | Tempo da massa do início ao fim do forno (operadores: ~20 min). **Confirmar** |
 | `t_coleta_min` | 5 | Tempo entre a saída do forno e a leitura do medidor |
 | `tsat_ref_c` | 175 | Temperatura de vapor de referência (≈ 8 bar) |
 | `t_produto_c` | 100 | Temperatura da massa enquanto evapora |
@@ -204,5 +216,5 @@ cd servico-umidade
 python -m unittest discover -s tests -t .
 ```
 
-São 55 testes, incluindo setpoint, PIN, modo e indicadores por período: tabela de vapor, regras do modelo, simulação de forno (perturbação de massa,
+São 64 testes, incluindo rosca dosadora, setpoint, PIN, modo e indicadores por período: tabela de vapor, regras do modelo, simulação de forno (perturbação de massa,
 queda de vapor, operador ignorando a sugestão), sincronização com o Node-RED e a API HTTP de ponta a ponta.

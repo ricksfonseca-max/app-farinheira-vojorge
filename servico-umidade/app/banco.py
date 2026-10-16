@@ -137,6 +137,9 @@ class Banco:
         ("amostras", "umidade_alvo", "REAL"),
         ("amostras", "modo", "TEXT"),
         ("sugestoes", "modo", "TEXT"),
+        ("sugestoes", "variavel", "TEXT"),          # rotacao | alimentacao
+        ("leituras", "alimentacao_hz", "REAL"),     # rosca dosadora
+        ("amostras", "alimentacao_hz", "REAL"),
     )
 
     def _migrar(self) -> None:

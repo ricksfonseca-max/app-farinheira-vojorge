@@ -1,6 +1,6 @@
 import { FormEvent, ReactNode, useCallback, useEffect, useState } from "react";
 import {
-  AlertTriangle, ArrowDown, ArrowUp, Download, Droplets, Flame, Gauge, Minus, Pencil, Target, Thermometer, Timer, X,
+  AlertTriangle, ArrowDown, ArrowUp, Cog, Download, Droplets, Flame, Gauge, Minus, Pencil, Target, Thermometer, X,
 } from "lucide-react";
 import { EstadoForno, EstadoGeral, Modo, TEXTO_ACAO, TEXTO_MODO, fmt, umidadeApi } from "@/services/umidade";
 
@@ -127,10 +127,10 @@ function Campo({ rotulo, children }: { rotulo: string; children: ReactNode }) {
 
 // ------------------------------------------------------------------ cartão de cada forno
 function Medida({
-  icone, rotulo, valor, detalhe, cor, acao,
-}: { icone: ReactNode; rotulo: string; valor: string; detalhe?: string; cor: string; acao?: ReactNode }) {
+  icone, rotulo, valor, detalhe, cor, acao, destaque = false,
+}: { icone: ReactNode; rotulo: string; valor: string; detalhe?: ReactNode; cor: string; acao?: ReactNode; destaque?: boolean }) {
   return (
-    <div className="rounded-lg border border-mata-800 bg-mata-900/60 p-2">
+    <div className={`rounded-lg border p-2 ${destaque ? "border-marca-600/60 bg-marca-500/5" : "border-mata-800 bg-mata-900/60"}`}>
       <div className="flex items-center justify-between gap-1">
         <div className="flex items-center gap-1 text-[10px] font-bold uppercase text-mata-500">
           {icone} {rotulo}
@@ -159,6 +159,8 @@ function CartaoForno({
   const idadeLeitura = f.leitura ? Math.round((agora - new Date(f.leitura.lido_em).getTime()) / 1000) : null;
   const Icone = s.acao === "reduzir" ? ArrowDown : s.acao === "aumentar" ? ArrowUp : Minus;
   const tempSaida = f.leitura?.temp_saida_c ?? null;
+  const porRosca = f.parametros.manipulada === "alimentacao";
+  const nomeVM = (f.parametros.nome_manipulada || (porRosca ? "Rosca" : "Rotação")).toLowerCase();
 
   const salvarSetpoint = async (usuario: string, pin: string, motivo: string) => {
     const valor = Number(novoSp.replace(",", "."));
@@ -182,7 +184,22 @@ function CartaoForno({
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        <Medida icone={<Gauge size={14} />} rotulo="Rotação" valor={`${fmt(f.leitura?.velocidade_hz)} Hz`} cor="text-mata-100" />
+        <Medida
+          icone={<Cog size={14} />}
+          rotulo="Rosca dosadora"
+          valor={`${fmt(f.leitura?.alimentacao_hz)} Hz`}
+          detalhe={porRosca ? "ajuste sugerido" : "alimentação"}
+          cor="text-mata-100"
+          destaque={porRosca}
+        />
+        <Medida
+          icone={<Gauge size={14} />}
+          rotulo="Rotação forno"
+          valor={`${fmt(f.leitura?.velocidade_hz)} Hz`}
+          detalhe={porRosca ? undefined : "ajuste sugerido"}
+          cor="text-mata-100"
+          destaque={!porRosca}
+        />
         <Medida
           icone={<Flame size={14} />}
           rotulo="Vapor"
@@ -201,7 +218,17 @@ function CartaoForno({
           icone={<Droplets size={14} />}
           rotulo="Umidade"
           valor={umid === null ? "–" : `${fmt(umid)}%`}
-          detalhe={f.ultima_amostra ? `amostra ${horaLocal(f.ultima_amostra.coletada_em)}` : "sem amostra"}
+          detalhe={
+            <>
+              {f.ultima_amostra ? `amostra ${horaLocal(f.ultima_amostra.coletada_em)}` : "sem amostra"}
+              {" · "}
+              {falta !== null && falta > 0 ? (
+                `próxima em ${falta} min`
+              ) : (
+                <span className="font-bold text-rose-400 animate-pulse">coletar agora</span>
+              )}
+            </>
+          }
           cor={corUmid}
         />
         <Medida
@@ -222,12 +249,6 @@ function CartaoForno({
             </button>
           }
         />
-        <Medida
-          icone={<Timer size={14} />}
-          rotulo="Próxima amostra"
-          valor={falta === null ? "agora" : falta <= 0 ? "AGORA" : `${falta} min`}
-          cor={falta !== null && falta <= 0 ? "text-rose-400 animate-pulse" : "text-mata-100"}
-        />
       </div>
 
       {modo === "linha_base" ? (
@@ -241,6 +262,7 @@ function CartaoForno({
             <div className={`flex items-center gap-2 text-xl font-black ${estilo.texto}`}>
               <Icone size={22} />
               {TEXTO_ACAO[s.acao] || s.acao.toUpperCase()}
+              {["aumentar", "reduzir", "manter"].includes(s.acao) && ` ${nomeVM.toUpperCase()}`}
             </div>
             {s.velocidade_sugerida_hz !== null && (
               <div className="text-right">
@@ -268,7 +290,7 @@ function CartaoForno({
       )}
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-mata-500">
-        <span>{modo === "linha_base" ? "Nada é enviado ao CLP." : "Modo conselheiro: ajuste a rotação na IHM."}</span>
+        <span>{modo === "linha_base" ? "Nada é enviado ao CLP." : `Modo conselheiro: ajuste a ${nomeVM} na IHM.`}</span>
         <span title={f.modelo.motivo}>
           K {fmt(s.ganho_k, 2)} %/Hz
           {f.modelo.k !== null && ` · dados: ${fmt(f.modelo.k, 2)} (${f.modelo.n} am.${f.modelo.confiavel ? ", confiável" : ""})`}

@@ -321,14 +321,25 @@ export function GraficosFornos() {
       nome: "Setpoint", cor: COR.referencia, forma: "degrau", tracejado: true, casas: 1, unidade: "%", alcanceMs: 0,
       pontos: dados.setpoints.map((s) => ({ t: s.t, v: s.umidade_alvo })),
     };
+    const porRosca = dados.variavel === "alimentacao";
+    const sugerida: SerieGrafico = {
+      nome: "Sugerida", cor: COR.referencia, forma: "degrau", tracejado: true, casas: 1, unidade: "Hz", alcanceMs: 0,
+      pontos: dados.sugestoes.map((s) => ({ t: s.t, v: s.velocidade_sugerida_hz })),
+    };
     return {
       faixaUmidade: dados.setpoints.map((s) => ({ t: s.t, lo: s.umidade_alvo - faixa, hi: s.umidade_alvo + faixa })),
       umidade: [umidade, setpoint],
+      // A variável que o sistema sugere ganha a linha "Sugerida"; a outra só mostra o real.
+      porRosca,
+      rosca: [
+        { nome: "Rosca real", cor: COR.medido, forma: "linha", casas: 1, unidade: "Hz", alcanceMs: alcance,
+          pontos: leituras.map((l) => ({ t: l.t, v: l.alimentacao_hz })) },
+        ...(porRosca ? [sugerida] : []),
+      ] as SerieGrafico[],
       rotacao: [
         { nome: "Rotação real", cor: COR.medido, forma: "linha", casas: 1, unidade: "Hz", alcanceMs: alcance,
           pontos: leituras.map((l) => ({ t: l.t, v: l.velocidade_hz })) },
-        { nome: "Sugerida", cor: COR.referencia, forma: "degrau", tracejado: true, casas: 1, unidade: "Hz", alcanceMs: 0,
-          pontos: dados.sugestoes.map((s) => ({ t: s.t, v: s.velocidade_sugerida_hz })) },
+        ...(porRosca ? [] : [sugerida]),
       ] as SerieGrafico[],
       vapor: [
         { nome: "Vapor (saturação)", cor: COR.vapor, forma: "linha", casas: 1, unidade: "°C", alcanceMs: alcance,
@@ -408,6 +419,9 @@ export function GraficosFornos() {
             <Painel titulo="Umidade da farinha (%)" series={graf.umidade} faixa={graf.faixaUmidade} x0={dados.inicio} x1={dados.fim}
               largura={largura} cursor={cursor} setCursor={setCursor} mostrarEixoX={false} marcos={graf.marcos}
               aviso="Nenhuma amostra de umidade no período" />
+            <Painel titulo="Alimentação · rosca dosadora (Hz)" series={graf.rosca} x0={dados.inicio} x1={dados.fim}
+              largura={largura} cursor={cursor} setCursor={setCursor} mostrarEixoX={false} marcos={graf.marcos}
+              aviso="Sem leitura da rosca no período" />
             <Painel titulo="Rotação do forno (Hz)" series={graf.rotacao} x0={dados.inicio} x1={dados.fim}
               largura={largura} cursor={cursor} setCursor={setCursor} mostrarEixoX={false} marcos={graf.marcos}
               aviso="Sem leitura de rotação no período" />

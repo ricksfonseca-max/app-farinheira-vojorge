@@ -178,6 +178,7 @@ class ServicoUmidade:
         rodando: bool,
         lido_em: datetime | None = None,
         temp_saida_c: float | None = None,
+        alimentacao_hz: float | None = None,
     ) -> bool:
         nome = normalizar_forno(forno, self.fornos)
         if nome is None:
@@ -189,24 +190,26 @@ class ServicoUmidade:
             self.banco.inserir("leituras", {
                 "forno": nome, "lido_em": iso(lido_em), "velocidade_hz": velocidade_hz,
                 "pressao_bar": pressao_bar, "tsat_c": tsat, "rodando": int(bool(rodando)),
-                "temp_saida_c": temp_saida_c,
+                "temp_saida_c": temp_saida_c, "alimentacao_hz": alimentacao_hz,
             })
-            self._leituras[nome] = LeituraProcesso(velocidade_hz, pressao_bar, bool(rodando), lido_em, temp_saida_c)
+            leitura = LeituraProcesso(velocidade_hz, pressao_bar, bool(rodando), lido_em, temp_saida_c, alimentacao_hz)
+            self._leituras[nome] = leitura
 
-            # Detecta mudança de rotação (começa a contar o tempo de espera).
-            # v_ref: None = desconhecido (serviço acabou de iniciar), 0 = forno estava parado.
+            # Detecta mudança na variável manipulada (registro para análise).
+            # v_ref: None = desconhecido (serviço acabou de iniciar), 0 = forno/rosca parados.
             est, v_ref = self._carregar_estado(nome)
             mudou_em = est.ultima_mudanca_velocidade_em
-            parado = (not rodando) or velocidade_hz is None or velocidade_hz < 1.0
+            mv = modelo.valor_manipulada(p, leitura)
+            parado = (not rodando) or velocidade_hz is None or velocidade_hz < 1.0 or mv is None or mv < 1.0
             if parado:
                 if v_ref not in (None, 0.0):
                     mudou_em = lido_em
                 v_ref = 0.0
             elif v_ref is None:
-                v_ref = velocidade_hz
-            elif v_ref == 0.0 or abs(velocidade_hz - v_ref) >= p.limiar_mudanca_hz:
+                v_ref = mv
+            elif v_ref == 0.0 or abs(mv - v_ref) >= p.limiar_mudanca_hz:
                 mudou_em = lido_em
-                v_ref = velocidade_hz
+                v_ref = mv
             est = EstadoControle(est.base_alvo_hz, est.fator_ref, est.definido_em,
                                  est.ultima_amostra_em, mudou_em)
             self._salvar_estado(nome, est, v_ref)
@@ -222,13 +225,14 @@ class ServicoUmidade:
         fim = coletada_em - timedelta(minutes=p.t_coleta_min)
         ini = fim - timedelta(minutes=p.t_residencia_min)
         linhas = self.banco.consultar(
-            """SELECT velocidade_hz, tsat_c, rodando FROM leituras
+            """SELECT velocidade_hz, alimentacao_hz, tsat_c, rodando FROM leituras
                WHERE forno = ? AND lido_em >= ? AND lido_em <= ?""",
             (forno, iso(ini), iso(fim)),
         )
-        validas = [r for r in linhas if r["rodando"] and r["velocidade_hz"] is not None]
-        fatores = [modelo.fator_vapor(r["tsat_c"], p) for r in validas]
-        pares = [(r["velocidade_hz"], f) for r, f in zip(validas, fatores) if f is not None]
+        validas = [r for r in linhas if r["rodando"] and r["velocidade_hz"] is not None
+                   and modelo.valor_manipulada(p, r) is not None]
+        fatores = [modelo.fator_processo(p, r["tsat_c"], r["velocidade_hz"]) for r in validas]
+        pares = [(modelo.valor_manipulada(p, r), f) for r, f in zip(validas, fatores) if f is not None]
         n = len(pares)
         esperado = p.t_residencia_min * 60 / max(self.cfg.intervalo_leitura_s, 1)
         if n < 3:
@@ -309,6 +313,7 @@ class ServicoUmidade:
                 "responsavel": responsavel, "registro_id": None if registro_id is None else str(registro_id),
                 "velocidade_hz": no_momento.get("velocidade_hz"), "pressao_bar": no_momento.get("pressao_bar"),
                 "tsat_c": no_momento.get("tsat_c"), "temp_saida_c": no_momento.get("temp_saida_c"),
+                "alimentacao_hz": no_momento.get("alimentacao_hz"),
                 "umidade_alvo": p.umidade_alvo, "modo": self.modo_atual()["modo"],
                 "recebida_em": iso(agora), **janela,
             })
@@ -392,7 +397,7 @@ class ServicoUmidade:
             "tsat_c": sug.tsat_c, "fator_vapor": sug.fator_vapor, "umidade": sug.umidade,
             "umidade_alvo": sug.umidade_alvo, "erro": sug.erro, "delta_hz": sug.delta_hz,
             "ganho_k": sug.ganho_k, "amostra_id": amostra_id, "avisos": json_avisos(sug.avisos),
-            "modo": self.modo_atual()["modo"],
+            "modo": self.modo_atual()["modo"], "variavel": sug.variavel,
         })
 
     def atualizar_sugestoes_vapor(self) -> None:
@@ -421,13 +426,14 @@ class ServicoUmidade:
             aplicada, v_apos = -1, None
             if s["acao"] in ACOES_AVALIAVEIS and s["velocidade_atual_hz"] is not None:
                 ini = de_iso(s["calculada_em"])
+                col = "alimentacao_hz" if s.get("variavel") == "alimentacao" else "velocidade_hz"
                 linhas = self.banco.consultar(
-                    """SELECT velocidade_hz FROM leituras WHERE forno = ? AND lido_em > ? AND lido_em <= ?
-                       AND velocidade_hz IS NOT NULL ORDER BY lido_em""",
+                    f"""SELECT {col} AS v FROM leituras WHERE forno = ? AND lido_em > ? AND lido_em <= ?
+                       AND {col} IS NOT NULL ORDER BY lido_em""",
                     (s["forno"], iso(ini), iso(ini + janela)),
                 )
                 if linhas:
-                    v_apos = linhas[-1]["velocidade_hz"]
+                    v_apos = linhas[-1]["v"]
                     lim = self.fornos[s["forno"]].limiar_mudanca_hz if s["forno"] in self.fornos else 0.5
                     desejado = s["velocidade_sugerida_hz"] - s["velocidade_atual_hz"]
                     movido = v_apos - s["velocidade_atual_hz"]
@@ -460,6 +466,7 @@ class ServicoUmidade:
                 "rodando": leitura.rodando,
                 "lido_em": iso(leitura.lido_em),
                 "temp_saida_c": leitura.temp_saida_c,
+                "alimentacao_hz": leitura.alimentacao_hz,
             },
             "setpoint": self.setpoint_atual(nome),
             "ultima_amostra": None if ultima is None else {
@@ -475,6 +482,7 @@ class ServicoUmidade:
                 "t_residencia_min": p.t_residencia_min, "intervalo_amostra_min": p.intervalo_amostra_min,
                 "setpoint_min": p.setpoint_min, "setpoint_max": p.setpoint_max,
                 "faixa_qualidade": p.faixa_qualidade,
+                "manipulada": p.manipulada, "nome_manipulada": modelo.NOME_VM[p.manipulada],
             },
             "modelo": self.estimativa_k(nome).como_dict(),
         }
@@ -515,7 +523,8 @@ class ServicoUmidade:
             """SELECT CAST(strftime('%s', lido_em) AS INTEGER) / ? AS bloco,
                       AVG(CASE WHEN rodando = 1 THEN velocidade_hz END) AS velocidade_hz,
                       AVG(pressao_bar) AS pressao_bar, AVG(tsat_c) AS tsat_c,
-                      AVG(temp_saida_c) AS temp_saida_c, MAX(rodando) AS rodando
+                      AVG(temp_saida_c) AS temp_saida_c, AVG(alimentacao_hz) AS alimentacao_hz,
+                      MAX(rodando) AS rodando
                FROM leituras WHERE forno = ? AND lido_em >= ? GROUP BY bloco ORDER BY bloco""",
             (passo_s, nome, iso(inicio)),
         )
@@ -523,6 +532,7 @@ class ServicoUmidade:
             "t": (r["bloco"] * passo_s + passo_s // 2) * 1000,
             "velocidade_hz": _arred(r["velocidade_hz"], 2), "pressao_bar": _arred(r["pressao_bar"], 2),
             "tsat_c": _arred(r["tsat_c"], 1), "temp_saida_c": _arred(r["temp_saida_c"], 1),
+            "alimentacao_hz": _arred(r["alimentacao_hz"], 2),
             "rodando": bool(r["rodando"]),
         } for r in leituras]
 
@@ -556,6 +566,7 @@ class ServicoUmidade:
         return {
             "forno": nome, "inicio": int(inicio.timestamp() * 1000), "fim": int(agora.timestamp() * 1000),
             "passo_min": passo_min, "faixa_qualidade": self.fornos[nome].faixa_qualidade,
+            "variavel": self.fornos[nome].manipulada,
             "leituras": serie_leituras, "amostras": amostras, "sugestoes": sugestoes,
             "setpoints": setpoints, "modos": modos,
             "resumo": self.resumo_umidade(nome, inicio, agora),

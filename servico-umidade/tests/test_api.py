@@ -16,8 +16,8 @@ from app.servidor import criar_servidor
 
 ESTADO_NODERED = {
     "fornos": [
-        {"forno": "Forno 01", "velocidade_hz": 40.0, "pressao_vapor_bar": 8.0, "rodando": True},
-        {"forno": "Forno 02", "velocidade_hz": 35.0, "pressao_vapor_bar": 8.0, "rodando": True},
+        {"forno": "Forno 01", "velocidade_hz": 40.0, "rosca_hz": 30.0, "pressao_vapor_bar": 8.0, "rodando": True},
+        {"forno": "Forno 02", "velocidade_hz": 35.0, "rosca_hz": 28.0, "pressao_vapor_bar": 8.0, "rodando": True},
     ]
 }
 REGISTROS = [{"id": 99, "forno": "Forno 02", "umidade": 12.1, "data_hora": None, "foto": "x" * 1000}]
@@ -102,7 +102,8 @@ class TestApi(unittest.TestCase):
         self.assertEqual(st, 201, corpo)
         res = json.loads(corpo)
         self.assertEqual(res["sugestao"]["acao"], "reduzir")
-        self.assertLess(res["sugestao"]["velocidade_sugerida_hz"], 40)
+        self.assertEqual(res["sugestao"]["variavel"], "alimentacao")
+        self.assertLess(res["sugestao"]["velocidade_sugerida_hz"], 30)
         st, corpo, _ = pedir(f"{self.base}/api/fornos/Forno%2001")
         self.assertEqual(json.loads(corpo)["ultima_amostra"]["umidade"], 13.5)
 

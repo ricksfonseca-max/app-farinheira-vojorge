@@ -1,16 +1,23 @@
-"""Modelo de sugestão de rotação do forno rotativo.
+"""Modelo de sugestão para o forno rotativo (rosca dosadora ou rotação do forno).
 
 Ideia física:
-  * Tempo de residência da massa ~ 1 / rotação  (mais rápido = sai mais úmida).
-  * Taxa de secagem ~ (T_vapor - T_massa)        (vapor mais frio = seca menos).
+  * Taxa de secagem ~ (T_vapor - T_massa)            (vapor mais frio = seca menos).
+  * Tempo de residência ~ 1 / rotação do forno        (girar mais rápido = sai mais úmida).
+  * Água a evaporar ~ alimentação (rosca dosadora)    (mais massa entrando = sai mais úmida).
+
+A variável manipulada (VM) é configurável por forno:
+  * "rotacao":     VM = rotação do forno;  fator = fator_vapor
+  * "alimentacao": VM = rosca dosadora;    fator = fator_vapor × (rotacao_ref / rotação)
+    (girar o forno mais rápido reduz a secagem por kg; o fator compensa isso também)
+
+Carga "base" = VM / fator: o valor equivalente da VM nas condições de referência.
 
 Duas partes:
-  1. FEEDFORWARD (vapor): a rotação "base" é a rotação equivalente com vapor na
-     temperatura de referência. Rotação sugerida = base × fator_vapor, onde
-     fator_vapor = (Tsat - T_massa) / (Tsat_ref - T_massa).
-     Se o vapor esfria, o fator cai e a sugestão reduz a rotação na hora.
-  2. FEEDBACK (amostra de umidade a cada ~20 min): parte da rotação base que a
-     massa daquela amostra realmente viu no forno (média da janela de residência)
+  1. FEEDFORWARD (vapor e rotação): VM sugerida = base × fator atual.
+     Se o vapor esfria (ou o forno passa a girar mais rápido), o fator cai e a
+     sugestão reduz a VM na hora, sem esperar amostra.
+  2. FEEDBACK (amostra de umidade a cada ~20 min): parte da base que a massa
+     daquela amostra realmente viu no forno (média da janela de residência)
      e corrige com banda morta, fração alfa e passo máximo.
 
 Tudo aqui é puro (sem banco, sem rede) para poder ser testado.
@@ -39,11 +46,12 @@ MARGEM_MIN_VAPOR_C = 10.0
 
 @dataclass(frozen=True)
 class LeituraProcesso:
-    velocidade_hz: float | None
+    velocidade_hz: float | None          # rotação do forno
     pressao_bar: float | None
     rodando: bool
     lido_em: datetime | None
     temp_saida_c: float | None = None    # PT100 na saída do produto (futuro)
+    alimentacao_hz: float | None = None  # rosca dosadora
 
 
 @dataclass(frozen=True)
@@ -61,11 +69,12 @@ class EstadoControle:
 class Sugestao:
     forno: str
     calculada_em: datetime
-    origem: str                              # "amostra" ou "vapor"
+    origem: str                              # "amostra", "vapor" ou "setpoint"
     acao: str
     motivo: str
-    velocidade_atual_hz: float | None = None
-    velocidade_sugerida_hz: float | None = None
+    variavel: str = "rotacao"                # qual VM os campos *_hz abaixo descrevem
+    velocidade_atual_hz: float | None = None    # valor atual da VM
+    velocidade_sugerida_hz: float | None = None  # valor sugerido da VM
     pressao_bar: float | None = None
     tsat_c: float | None = None
     fator_vapor: float | None = None
@@ -95,6 +104,27 @@ def fator_vapor(tsat_c: float | None, p: ParametrosForno) -> float | None:
     return (tsat_c - p.t_produto_c) / (p.tsat_ref_c - p.t_produto_c)
 
 
+NOME_VM = {"alimentacao": "Rosca", "rotacao": "Rotação"}
+
+
+def valor_manipulada(p: ParametrosForno, leitura) -> float | None:
+    """Valor atual da variável manipulada (aceita LeituraProcesso ou linha do banco)."""
+    campo = "alimentacao_hz" if p.manipulada == "alimentacao" else "velocidade_hz"
+    return leitura[campo] if isinstance(leitura, dict) else getattr(leitura, campo)
+
+
+def fator_processo(p: ParametrosForno, tsat_c: float | None, rotacao_hz: float | None) -> float | None:
+    """Capacidade relativa de secagem por unidade da variável manipulada."""
+    fv = fator_vapor(tsat_c, p)
+    if fv is None:
+        return None
+    if p.manipulada == "alimentacao":
+        if rotacao_hz is None or rotacao_hz < 1.0:
+            return None
+        return fv * p.rotacao_ref_hz / rotacao_hz
+    return fv
+
+
 def _n(v: float, casas: int = 1, sinal: bool = False) -> str:
     """Número no formato brasileiro (vírgula decimal)."""
     return f"{v:{'+' if sinal else ''}.{casas}f}".replace(".", ",")
@@ -121,10 +151,14 @@ def _checar_processo(
     idade = (agora - leitura.lido_em).total_seconds()
     if idade > validade_s:
         return SEM_DADOS, f"Leitura do CLP desatualizada ({_n(idade / 60, 0)} min)."
-    if leitura.velocidade_hz is None or leitura.pressao_bar is None:
-        return SEM_DADOS, "Leitura do CLP incompleta (rotação ou pressão ausente)."
+    mv = valor_manipulada(p, leitura)
+    if leitura.velocidade_hz is None or leitura.pressao_bar is None or mv is None:
+        falta = "rosca" if mv is None and p.manipulada == "alimentacao" else "rotação ou pressão"
+        return SEM_DADOS, f"Leitura do CLP incompleta ({falta} ausente)."
     if not leitura.rodando or leitura.velocidade_hz < 1.0:
         return FORNO_PARADO, "Forno parado."
+    if mv < 1.0:
+        return FORNO_PARADO, "Rosca dosadora parada."
     tsat = tsat_pressao_manometrica(leitura.pressao_bar)
     if fator_vapor(tsat, p) is None:
         return SEM_VAPOR, f"Pressão de vapor insuficiente ({_n(leitura.pressao_bar, 1)} bar)."
@@ -155,7 +189,7 @@ def sugerir_por_amostra(
     """
     sug = Sugestao(
         forno=p.nome, calculada_em=agora, origem="amostra", acao=MANTER, motivo="",
-        umidade=umidade, umidade_alvo=p.umidade_alvo, ganho_k=ganho_k,
+        umidade=umidade, umidade_alvo=p.umidade_alvo, ganho_k=ganho_k, variavel=p.manipulada,
     )
     sug.erro = umidade - p.umidade_alvo
 
@@ -181,10 +215,11 @@ def sugerir_por_amostra(
         )
 
     assert leitura is not None and leitura.velocidade_hz is not None
-    f_atual = leitura.velocidade_hz
+    f_atual = valor_manipulada(p, leitura)
     tsat = tsat_pressao_manometrica(leitura.pressao_bar)
-    fator = fator_vapor(tsat, p)
-    assert tsat is not None and fator is not None
+    fator = fator_processo(p, tsat, leitura.velocidade_hz)
+    assert f_atual is not None and tsat is not None and fator is not None
+    sug.variavel = p.manipulada
     sug.velocidade_atual_hz = f_atual
     sug.pressao_bar = leitura.pressao_bar
     sug.tsat_c = tsat
@@ -224,9 +259,9 @@ def sugerir_por_amostra(
     if abs(sug.delta_vapor_hz) >= p.limiar_mudanca_hz:
         sug.motivo += f" Compensação de vapor/rotação desde a amostra: {_n(sug.delta_vapor_hz, 1, True)} Hz."
     if sug.acao == MANTER:
-        sug.motivo += " Manter rotação."
+        sug.motivo += f" Manter {NOME_VM[p.manipulada].lower()}."
     else:
-        sug.motivo += f" Rotação {_n(f_atual, 1)} → {_n(f_sug, 1)} Hz."
+        sug.motivo += f" {NOME_VM[p.manipulada]} {_n(f_atual, 1)} → {_n(f_sug, 1)} Hz."
     if f_sug in (p.f_min_hz, p.f_max_hz) and abs(delta) > 0:
         sug.avisos.append(f"Sugestão limitada pela faixa {_n(p.f_min_hz, 0)}–{_n(p.f_max_hz, 0)} Hz.")
 
@@ -248,7 +283,7 @@ def sugerir_por_vapor(
 ) -> Sugestao:
     """Sugestão "ao vivo": aplica o fator de vapor atual à rotação base desejada."""
     sug = Sugestao(forno=p.nome, calculada_em=agora, origem="vapor", acao=MANTER, motivo="",
-                   umidade=ultima_umidade, umidade_alvo=p.umidade_alvo)
+                   umidade=ultima_umidade, umidade_alvo=p.umidade_alvo, variavel=p.manipulada)
     if ultima_umidade is not None:
         sug.erro = ultima_umidade - p.umidade_alvo
 
@@ -258,10 +293,11 @@ def sugerir_por_vapor(
         return sug
 
     assert leitura is not None and leitura.velocidade_hz is not None
-    f_atual = leitura.velocidade_hz
+    f_atual = valor_manipulada(p, leitura)
     tsat = tsat_pressao_manometrica(leitura.pressao_bar)
-    fator = fator_vapor(tsat, p)
-    assert tsat is not None and fator is not None
+    fator = fator_processo(p, tsat, leitura.velocidade_hz)
+    assert f_atual is not None and tsat is not None and fator is not None
+    sug.variavel = p.manipulada
     sug.velocidade_atual_hz = f_atual
     sug.pressao_bar = leitura.pressao_bar
     sug.tsat_c = tsat
@@ -277,7 +313,7 @@ def sugerir_por_vapor(
     if estado.base_alvo_hz is None:
         sug.velocidade_sugerida_hz = f_atual
         sug.delta_hz = 0.0
-        sug.motivo = "Sem referência de umidade ainda: manter rotação atual."
+        sug.motivo = f"Sem referência de umidade ainda: manter {NOME_VM[p.manipulada].lower()} atual."
         return sug
 
     f_sug = _limitar(estado.base_alvo_hz * fator, p.f_min_hz, p.f_max_hz)
@@ -291,14 +327,17 @@ def sugerir_por_vapor(
     sug.acao = _acao_por_delta(delta, p.limiar_mudanca_hz)
 
     if sug.acao == MANTER:
-        sug.motivo = f"Rotação {_n(f_atual, 1)} Hz adequada para o vapor atual ({_n(tsat, 0)} °C)."
+        sug.motivo = f"{NOME_VM[p.manipulada]} {_n(f_atual, 1)} Hz adequada para o vapor atual ({_n(tsat, 0)} °C)."
     else:
         partes = []
         if abs(sug.delta_amostra_hz) >= p.limiar_mudanca_hz:
             partes.append(f"correção da última amostra ({_n(sug.delta_amostra_hz, 1, True)} Hz)")
         if abs(sug.delta_vapor_hz) >= p.limiar_mudanca_hz:
-            sentido = "caiu" if sug.delta_vapor_hz < 0 else "subiu"
-            partes.append(f"vapor {sentido} para {_n(tsat, 0)} °C ({_n(sug.delta_vapor_hz, 1, True)} Hz)")
+            if p.manipulada == "alimentacao":
+                partes.append(f"vapor ({_n(tsat, 0)} °C) e rotação do forno ({_n(sug.delta_vapor_hz, 1, True)} Hz)")
+            else:
+                sentido = "caiu" if sug.delta_vapor_hz < 0 else "subiu"
+                partes.append(f"vapor {sentido} para {_n(tsat, 0)} °C ({_n(sug.delta_vapor_hz, 1, True)} Hz)")
         detalhe = " e ".join(partes) if partes else "ajuste acumulado"
-        sug.motivo = f"Rotação {_n(f_atual, 1)} → {_n(f_sug, 1)} Hz: {detalhe}."
+        sug.motivo = f"{NOME_VM[p.manipulada]} {_n(f_atual, 1)} → {_n(f_sug, 1)} Hz: {detalhe}."
     return sug
