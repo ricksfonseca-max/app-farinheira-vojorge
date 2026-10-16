@@ -106,8 +106,8 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
         // Se o serviço estiver fora, o apontamento já foi salvo e ele sincroniza depois pelo Node-RED.
         umidadeApi
           .registrarAmostra({ forno, umidade: parseFloat(umidade), data_hora: dataHora, tipo_farinha: tipoFarinha, peneira, responsavel })
-          .then(({ sugestao: s }) => {
-            if (!s) return;
+          .then(({ sugestao: s, modo }) => {
+            if (!s || modo === "linha_base") return; // linha de base: não mostra sugestão ao operador
             const hz = s.velocidade_sugerida_hz !== null ? ` → ${s.velocidade_sugerida_hz.toFixed(1)} Hz` : "";
             toast({ title: `${forno}: ${TEXTO_ACAO[s.acao] ?? s.acao}${hz}`, description: s.motivo, duration: 20000 });
             onSubmit();

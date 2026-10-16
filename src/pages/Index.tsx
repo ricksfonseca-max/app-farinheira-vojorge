@@ -5,6 +5,7 @@ import { ProductionTable } from "@/components/ProductionTable";
 import { MoistureTrends } from "@/components/MoistureTrends";
 import { Header } from "@/components/Header";
 import { PainelFornos } from "@/components/PainelFornos";
+import { GraficosFornos } from "@/components/GraficosFornos";
 import { Loader2, ListChecks, BarChart3, LayoutDashboard } from "lucide-react";
 
 export default function Index() {
@@ -64,8 +65,12 @@ export default function Index() {
         )}
 
         {activeTab === 'graficos' && (
-           <div className="animate-in fade-in duration-500 max-w-5xl mx-auto bg-slate-900 rounded-xl shadow-2xl border border-slate-800 p-4">
-             <MoistureTrends records={records} />
+           <div className="animate-in fade-in duration-500">
+             <GraficosFornos />
+             <h3 className="mb-2 text-sm font-bold uppercase tracking-widest text-slate-400">Histórico de apontamentos</h3>
+             <div className="max-w-5xl bg-slate-900 rounded-xl shadow-2xl border border-slate-800 p-4">
+               <MoistureTrends records={records} />
+             </div>
            </div>
         )}
       </main>

@@ -76,6 +76,24 @@ CREATE TABLE IF NOT EXISTS sugestoes (
 );
 CREATE INDEX IF NOT EXISTS ix_sugestoes_forno_tempo ON sugestoes (forno, calculada_em);
 
+CREATE TABLE IF NOT EXISTS setpoints (          -- histórico: a linha mais recente vale
+    id            INTEGER PRIMARY KEY,
+    forno         TEXT NOT NULL,
+    umidade_alvo  REAL NOT NULL,
+    alterado_por  TEXT,
+    motivo        TEXT,
+    alterado_em   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_setpoints_forno_tempo ON setpoints (forno, alterado_em);
+
+CREATE TABLE IF NOT EXISTS modos (              -- histórico do modo da planta
+    id            INTEGER PRIMARY KEY,
+    modo          TEXT NOT NULL,                -- linha_base | conselheiro
+    alterado_por  TEXT,
+    motivo        TEXT,
+    alterado_em   TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS estado_forno (
     forno                        TEXT PRIMARY KEY,
     base_alvo_hz                 REAL,
@@ -110,6 +128,23 @@ class Banco:
         with self._trava:
             self._con.executescript(ESQUEMA)
             self._con.commit()
+            self._migrar()
+
+    # Colunas acrescentadas depois da primeira versão (bancos antigos ganham na hora).
+    _MIGRACOES = (
+        ("leituras", "temp_saida_c", "REAL"),
+        ("amostras", "temp_saida_c", "REAL"),
+        ("amostras", "umidade_alvo", "REAL"),
+        ("amostras", "modo", "TEXT"),
+        ("sugestoes", "modo", "TEXT"),
+    )
+
+    def _migrar(self) -> None:
+        for tabela, coluna, tipo in self._MIGRACOES:
+            existentes = {r[1] for r in self._con.execute(f"PRAGMA table_info({tabela})")}
+            if coluna not in existentes:
+                self._con.execute(f"ALTER TABLE {tabela} ADD COLUMN {coluna} {tipo}")
+        self._con.commit()
 
     def executar(self, sql: str, params: tuple | dict = ()) -> sqlite3.Cursor:
         with self._trava:

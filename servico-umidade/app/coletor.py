@@ -43,11 +43,12 @@ def interpretar_fornos(dados) -> list[dict]:
     for v in itens:
         vel = _num(v.get("velocidade_hz", v.get("velocidade")))
         pres = _num(v.get("pressao_vapor_bar", v.get("pressao_bar", v.get("pressao"))))
+        temp = _num(v.get("temp_saida_produto_c", v.get("temp_saida_c")))
         rodando = v.get("rodando")
         if rodando is None:
             rodando = vel is not None and vel >= 1.0
         saida.append({"forno": v.get("forno"), "velocidade_hz": vel, "pressao_bar": pres,
-                      "rodando": bool(rodando)})
+                      "temp_saida_c": temp, "rodando": bool(rodando)})
     return saida
 
 
@@ -87,7 +88,7 @@ class Coletor:
                 sem_dado.append(f["forno"])
                 continue
             reconhecidos += self.servico.registrar_leitura(
-                f["forno"], f["velocidade_hz"], f["pressao_bar"], f["rodando"])
+                f["forno"], f["velocidade_hz"], f["pressao_bar"], f["rodando"], temp_saida_c=f["temp_saida_c"])
         if sem_dado:
             log.warning("Sem leitura válida do CLP para: %s", ", ".join(map(str, sem_dado)))
         if not reconhecidos:

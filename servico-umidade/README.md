@@ -4,8 +4,15 @@ Serviço Python (Docker) que lê a **rotação** e a **pressão do vapor** dos d
 rotativos, recebe a **umidade** apontada pelo operador no app Farinheira (a cada ~20 min) e
 **sugere a rotação** de cada forno. Ele grava tudo em banco para avaliar o modelo ao fim do mês.
 
-> **Modo conselheiro:** o serviço **não escreve nada no CLP**. Ele só sugere. O operador
-> decide e ajusta a rotação na IHM. O serviço registra se a sugestão foi seguida.
+> **O serviço não escreve nada no CLP.** Ele tem dois modos, trocados na tela com PIN de supervisor:
+>
+> - **Linha de base** (padrão no primeiro start): só registra. As sugestões são calculadas e
+>   gravadas, mas ficam ocultas para o operador. É o período "antes" do comparativo.
+> - **Conselheiro:** o operador vê a rotação sugerida, decide e ajusta na IHM. O serviço registra
+>   se a sugestão foi seguida.
+>
+> Cada amostra grava o modo e o setpoint em vigor. Assim o comparativo **antes × depois** sai
+> direto dos dados, sem planilha paralela.
 
 ```
 M580 ──Modbus──► Node-RED ──GET /api/fornos (15 s)──► servico-umidade ◄──POST /api/amostras── App Farinheira
@@ -77,6 +84,12 @@ Com a massa de entrada 1,5 ponto mais úmida, a umidade volta para dentro da ban
    | %MW101 | Rotação forno 2 em Hz × 10 |
    | %MW102 | Pressão do vapor em bar × 10 (manométrica) |
    | %MW103 | bit0 = forno 1 girando, bit1 = forno 2 girando |
+   | %MW104 | (futuro) PT100 saída do produto forno 1 em °C × 10 |
+   | %MW105 | (futuro) PT100 saída do produto forno 2 em °C × 10 |
+
+   Enquanto o PT100 não existir, deixe a leitura com 4 registradores: o campo aparece como
+   "PT100 a instalar" e o gráfico da saída do produto fica oculto. A temperatura já é gravada
+   em `leituras.temp_saida_c` e em cada amostra, pronta para virar a malha rápida (cascata) depois.
 
 4. Teste: `http://192.168.10.201:1880/api/fornos` deve responder:
 
@@ -122,7 +135,9 @@ na rede do Docker. Os dois containers precisam estar no mesmo compose ou na mesm
 | `INTERVALO_LEITURA_S` | 15 | Período de leitura do processo |
 | `LEITURA_VALIDADE_S` | 120 | Idade máxima da leitura para sugerir |
 | `FUSO_HORARIO_PADRAO` | -03:00 | Fuso para datas sem fuso vindas do Node-RED |
-| `TOKEN_API` | – | Se definido, `POST /api/amostras` exige o cabeçalho `X-Token` |
+| `TOKEN_API` | – | Se definido, todos os POST exigem o cabeçalho `X-Token` |
+| `SENHA_SUPERVISOR` | – | PIN pedido na tela para mudar setpoint e modo (vazio = sem PIN) |
+| `MODO_INICIAL` | linha_base | Modo do primeiro start (`linha_base` ou `conselheiro`) |
 | `BANCO` | /dados/umidade.db | Arquivo SQLite (fica no volume `dados-umidade`) |
 
 ### 2.4 Parâmetros por forno: `config/fornos.json`
@@ -131,7 +146,9 @@ na rede do Docker. Os dois containers precisam estar no mesmo compose ou na mesm
 
 | Parâmetro | Padrão | O que é |
 |---|---|---|
-| `umidade_alvo` | 12,0 | Umidade desejada (%) |
+| `umidade_alvo` | 12,0 | Setpoint inicial (%). Depois, quem manda é o setpoint alterado na tela (com histórico) |
+| `faixa_qualidade` | 0,5 | ± em torno do setpoint considerado "dentro" nos indicadores e gráficos |
+| `setpoint_min` / `setpoint_max` | 5 / 20 | Faixa permitida para o setpoint digitado na tela |
 | `banda_morta` | 0,3 | Erro (%) que não gera correção |
 | `ganho_k` | 0,5 | % de umidade por Hz. **O mais importante: levantar nos dados (seção 3)** |
 | `alfa` | 0,5 | Fração do erro corrigida por amostra (0,3 conservador … 1,0 agressivo) |
@@ -172,6 +189,10 @@ na rede do Docker. Os dois containers precisam estar no mesmo compose ou na mesm
 | GET | `/saude` | 200 se a leitura do CLP está em dia, 503 se não |
 | GET | `/api/fornos` | Estado dos fornos + sugestão atual (usado pelo painel) |
 | GET | `/api/fornos/{forno}` | Um forno (`Forno%2001`) |
+| POST | `/api/fornos/{forno}/setpoint` | `{"umidade_alvo", "usuario", "pin", "motivo"}`: muda o setpoint daquele forno |
+| GET | `/api/setpoints?forno=` | Histórico de setpoints (quem, quando, motivo) |
+| GET / POST | `/api/modo` | Modo atual e histórico / `{"modo": "conselheiro", "usuario", "pin"}` |
+| GET | `/api/series?forno=&horas=` | Dados dos gráficos + indicadores do período (geral e por modo) |
 | POST | `/api/amostras` | `{"forno","umidade","data_hora","responsavel","tipo_farinha","peneira"}` → sugestão |
 | GET | `/api/amostras`, `/api/sugestoes`, `/api/leituras` | `?forno=&dias=&horas=&limite=` |
 | GET | `/api/exportar/{amostras\|sugestoes\|leituras}.csv` | CSV com `;`, vírgula decimal e hora local |
@@ -183,5 +204,5 @@ cd servico-umidade
 python -m unittest discover -s tests -t .
 ```
 
-São 43 testes: tabela de vapor, regras do modelo, simulação de forno (perturbação de massa,
+São 55 testes, incluindo setpoint, PIN, modo e indicadores por período: tabela de vapor, regras do modelo, simulação de forno (perturbação de massa,
 queda de vapor, operador ignorando a sugestão), sincronização com o Node-RED e a API HTTP de ponta a ponta.

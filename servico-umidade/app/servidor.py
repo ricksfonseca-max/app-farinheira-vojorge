@@ -7,6 +7,7 @@ import io
 import json
 import logging
 import math
+import time
 from datetime import timedelta
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -118,6 +119,24 @@ def criar_servidor(servico: ServicoUmidade, host: str = "0.0.0.0", porta: int | 
             if caminho == "/api/fornos":
                 return self._json(200, servico.estado_geral())
 
+            if caminho == "/api/series":
+                try:
+                    horas = float(q.get("horas", "24"))
+                except ValueError:
+                    raise ErroApi(400, "horas inválido") from None
+                return self._json(200, servico.series(self._forno(q.get("forno"), obrigatorio=True), horas))
+
+            if caminho == "/api/modo":
+                historico = servico.banco.consultar("SELECT * FROM modos ORDER BY id DESC LIMIT 100")
+                return self._json(200, {**servico.modo_atual(), "historico": historico})
+
+            if caminho == "/api/setpoints":
+                forno = self._forno(q.get("forno"))
+                sql, params = "SELECT * FROM setpoints", ()
+                if forno:
+                    sql, params = sql + " WHERE forno = ?", (forno,)
+                return self._json(200, servico.banco.consultar(sql + " ORDER BY id DESC LIMIT 500", params))
+
             if caminho.startswith("/api/fornos/"):
                 nome = self._forno(unquote(caminho.split("/", 3)[3]), obrigatorio=True)
                 return self._json(200, servico.estado_forno(nome))
@@ -139,12 +158,7 @@ def criar_servidor(servico: ServicoUmidade, host: str = "0.0.0.0", porta: int | 
 
             raise ErroApi(404, "Rota não encontrada")
 
-        def _rotear_post(self):
-            caminho = urlparse(self.path).path.rstrip("/")
-            if caminho != "/api/amostras":
-                raise ErroApi(404, "Rota não encontrada")
-            if cfg.token_api and self.headers.get("X-Token") != cfg.token_api:
-                raise ErroApi(401, "Token inválido")
+        def _corpo(self) -> dict:
             tamanho = int(self.headers.get("Content-Length") or 0)
             if tamanho <= 0 or tamanho > TAMANHO_MAX_CORPO:
                 raise ErroApi(400, "Corpo da requisição vazio ou grande demais (não envie a foto)")
@@ -154,6 +168,37 @@ def criar_servidor(servico: ServicoUmidade, host: str = "0.0.0.0", porta: int | 
                 raise ErroApi(400, "JSON inválido") from None
             if not isinstance(dados, dict):
                 raise ErroApi(400, "JSON deve ser um objeto")
+            return dados
+
+        def _exigir_supervisor(self, dados: dict):
+            if not servico.conferir_pin(dados.get("pin")):
+                time.sleep(1.0)  # freia tentativas de adivinhar o PIN
+                raise ErroApi(403, "PIN do supervisor incorreto")
+
+        def _rotear_post(self):
+            caminho = urlparse(self.path).path.rstrip("/")
+            if cfg.token_api and self.headers.get("X-Token") != cfg.token_api:
+                raise ErroApi(401, "Token inválido")
+
+            if caminho.startswith("/api/fornos/") and caminho.endswith("/setpoint"):
+                nome = self._forno(unquote(caminho.split("/")[3]), obrigatorio=True)
+                dados = self._corpo()
+                self._exigir_supervisor(dados)
+                if dados.get("umidade_alvo") in (None, ""):
+                    raise ErroApi(400, "Informe o setpoint (umidade_alvo)")
+                estado = servico.alterar_setpoint(nome, dados["umidade_alvo"], _texto(dados.get("usuario")),
+                                                  _texto(dados.get("motivo")))
+                return self._json(200, estado)
+
+            if caminho == "/api/modo":
+                dados = self._corpo()
+                self._exigir_supervisor(dados)
+                return self._json(200, servico.alterar_modo(str(dados.get("modo") or ""),
+                                                            _texto(dados.get("usuario")), _texto(dados.get("motivo"))))
+
+            if caminho != "/api/amostras":
+                raise ErroApi(404, "Rota não encontrada")
+            dados = self._corpo()
             forno = self._forno(dados.get("forno"), obrigatorio=True)
             if dados.get("umidade") in (None, ""):
                 raise ErroApi(400, "Informe a umidade")

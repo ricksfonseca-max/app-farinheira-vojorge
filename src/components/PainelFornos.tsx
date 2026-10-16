@@ -1,8 +1,11 @@
-import { ReactNode, useCallback, useEffect, useState } from "react";
-import { AlertTriangle, ArrowDown, ArrowUp, Download, Droplets, Flame, Gauge, Minus, Timer } from "lucide-react";
-import { EstadoForno, EstadoGeral, TEXTO_ACAO, umidadeApi } from "@/services/umidade";
+import { FormEvent, ReactNode, useCallback, useEffect, useState } from "react";
+import {
+  AlertTriangle, ArrowDown, ArrowUp, Download, Droplets, Flame, Gauge, Minus, Pencil, Target, Thermometer, Timer, X,
+} from "lucide-react";
+import { EstadoForno, EstadoGeral, Modo, TEXTO_ACAO, TEXTO_MODO, fmt, umidadeApi } from "@/services/umidade";
 
 const INTERVALO_MS = 10000;
+const CHAVE_USUARIO = "umidade_supervisor";
 
 const ESTILO_ACAO: Record<string, { caixa: string; texto: string }> = {
   reduzir: { caixa: "border-amber-500/60 bg-amber-500/10", texto: "text-amber-400" },
@@ -12,8 +15,11 @@ const ESTILO_ACAO: Record<string, { caixa: string; texto: string }> = {
 };
 const ESTILO_NEUTRO = { caixa: "border-slate-700 bg-slate-800/40", texto: "text-slate-400" };
 
-function fmt(v: number | null | undefined, casas = 1) {
-  return v === null || v === undefined ? "–" : v.toFixed(casas).replace(".", ",");
+function lerUsuario() {
+  try { return localStorage.getItem(CHAVE_USUARIO) || ""; } catch { return ""; }
+}
+function salvarUsuario(nome: string) {
+  try { localStorage.setItem(CHAVE_USUARIO, nome); } catch { /* sem armazenamento: tudo bem */ }
 }
 
 function minutosAte(iso: string | null, agora: number) {
@@ -25,17 +31,141 @@ function horaLocal(iso: string | null | undefined) {
   return iso ? new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "–";
 }
 
-function CartaoForno({ f, agora }: { f: EstadoForno; agora: number }) {
+function dataLocal(iso: string | null | undefined) {
+  return iso ? new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "–";
+}
+
+// ------------------------------------------------------------------ modal do supervisor
+function ModalSupervisor({
+  titulo, pinExigido, aoFechar, aoConfirmar, children, textoConfirmar = "Confirmar",
+}: {
+  titulo: string;
+  pinExigido: boolean;
+  aoFechar: () => void;
+  aoConfirmar: (usuario: string, pin: string, motivo: string) => Promise<void>;
+  children?: ReactNode;
+  textoConfirmar?: string;
+}) {
+  const [usuario, setUsuario] = useState(lerUsuario);
+  const [pin, setPin] = useState("");
+  const [motivo, setMotivo] = useState("");
+  const [erro, setErro] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
+
+  const enviar = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!usuario.trim()) { setErro("Informe seu nome."); return; }
+    setEnviando(true);
+    setErro(null);
+    try {
+      await aoConfirmar(usuario.trim(), pin, motivo.trim());
+      salvarUsuario(usuario.trim());
+      aoFechar();
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Não foi possível salvar.");
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 p-4" onClick={aoFechar}>
+      <form
+        onSubmit={enviar}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-sm rounded-xl border border-slate-700 bg-[#0f172a] p-5 shadow-2xl"
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-base font-bold text-slate-100">{titulo}</h3>
+          <button type="button" onClick={aoFechar} className="text-slate-500 hover:text-slate-300" aria-label="Fechar">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="space-y-3">
+          {children}
+          <Campo rotulo="Seu nome">
+            <input value={usuario} onChange={(e) => setUsuario(e.target.value)} maxLength={60} className={CLASSE_INPUT} />
+          </Campo>
+          {pinExigido && (
+            <Campo rotulo="PIN do supervisor">
+              <input type="password" value={pin} onChange={(e) => setPin(e.target.value)} className={CLASSE_INPUT} />
+            </Campo>
+          )}
+          <Campo rotulo="Motivo (opcional)">
+            <input value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={200} className={CLASSE_INPUT} />
+          </Campo>
+          {erro && <p className="text-sm font-medium text-rose-400">{erro}</p>}
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" onClick={aoFechar} className="rounded-lg px-4 py-2 text-sm text-slate-400 hover:bg-slate-800">
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={enviando}
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-500 disabled:opacity-50"
+          >
+            {enviando ? "Salvando..." : textoConfirmar}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+const CLASSE_INPUT =
+  "h-10 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 text-slate-100 outline-none focus:border-emerald-500";
+
+function Campo({ rotulo, children }: { rotulo: string; children: ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-[11px] font-bold uppercase text-slate-500">{rotulo}</span>
+      {children}
+    </label>
+  );
+}
+
+// ------------------------------------------------------------------ cartão de cada forno
+function Medida({
+  icone, rotulo, valor, detalhe, cor, acao,
+}: { icone: ReactNode; rotulo: string; valor: string; detalhe?: string; cor: string; acao?: ReactNode }) {
+  return (
+    <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-2">
+      <div className="flex items-center justify-between gap-1">
+        <div className="flex items-center gap-1 text-[10px] font-bold uppercase text-slate-500">
+          {icone} {rotulo}
+        </div>
+        {acao}
+      </div>
+      <div className={`font-mono text-lg font-bold ${cor}`}>{valor}</div>
+      {detalhe && <div className="font-mono text-[11px] text-slate-500">{detalhe}</div>}
+    </div>
+  );
+}
+
+function CartaoForno({
+  f, agora, modo, pinExigido, aoAtualizar,
+}: { f: EstadoForno; agora: number; modo: Modo; pinExigido: boolean; aoAtualizar: () => void }) {
+  const [editando, setEditando] = useState(false);
+  const [novoSp, setNovoSp] = useState(String(f.setpoint.umidade_alvo).replace(".", ","));
   const s = f.sugestao;
   const estilo = ESTILO_ACAO[s.acao] || ESTILO_NEUTRO;
-  const alvo = f.parametros.umidade_alvo;
-  const banda = f.parametros.banda_morta;
+  const alvo = f.setpoint.umidade_alvo;
+  const faixa = f.parametros.faixa_qualidade ?? f.parametros.banda_morta;
   const umid = f.ultima_amostra?.umidade ?? null;
   const corUmid =
-    umid === null ? "text-slate-500" : Math.abs(umid - alvo) <= banda ? "text-emerald-400" : umid > alvo ? "text-amber-400" : "text-sky-400";
+    umid === null ? "text-slate-500" : Math.abs(umid - alvo) <= faixa ? "text-emerald-400" : umid > alvo ? "text-amber-400" : "text-sky-400";
   const falta = minutosAte(f.proxima_amostra_em, agora);
   const idadeLeitura = f.leitura ? Math.round((agora - new Date(f.leitura.lido_em).getTime()) / 1000) : null;
   const Icone = s.acao === "reduzir" ? ArrowDown : s.acao === "aumentar" ? ArrowUp : Minus;
+  const tempSaida = f.leitura?.temp_saida_c ?? null;
+
+  const salvarSetpoint = async (usuario: string, pin: string, motivo: string) => {
+    const valor = Number(novoSp.replace(",", "."));
+    if (!Number.isFinite(valor)) throw new Error("Digite um número, ex.: 12,5");
+    await umidadeApi.alterarSetpoint(f.forno, valor, usuario, pin, motivo || undefined);
+    aoAtualizar();
+  };
 
   return (
     <div className="rounded-xl border border-slate-800 bg-[#0f172a] p-4 shadow-2xl">
@@ -51,7 +181,7 @@ function CartaoForno({ f, agora }: { f: EstadoForno; agora: number }) {
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <Medida icone={<Gauge size={14} />} rotulo="Rotação" valor={`${fmt(f.leitura?.velocidade_hz)} Hz`} cor="text-slate-100" />
         <Medida
           icone={<Flame size={14} />}
@@ -61,11 +191,36 @@ function CartaoForno({ f, agora }: { f: EstadoForno; agora: number }) {
           cor="text-orange-400"
         />
         <Medida
+          icone={<Thermometer size={14} />}
+          rotulo="Saída produto"
+          valor={tempSaida === null ? "–" : `${fmt(tempSaida)} °C`}
+          detalhe={tempSaida === null ? "PT100 a instalar" : "PT100"}
+          cor={tempSaida === null ? "text-slate-600" : "text-rose-300"}
+        />
+        <Medida
           icone={<Droplets size={14} />}
-          rotulo={`Umidade (alvo ${fmt(alvo)}%)`}
+          rotulo="Umidade"
           valor={umid === null ? "–" : `${fmt(umid)}%`}
-          detalhe={f.ultima_amostra ? horaLocal(f.ultima_amostra.coletada_em) : undefined}
+          detalhe={f.ultima_amostra ? `amostra ${horaLocal(f.ultima_amostra.coletada_em)}` : "sem amostra"}
           cor={corUmid}
+        />
+        <Medida
+          icone={<Target size={14} />}
+          rotulo="Setpoint"
+          valor={`${fmt(alvo)}%`}
+          detalhe={`± ${fmt(faixa)}${f.setpoint.alterado_por ? ` · ${f.setpoint.alterado_por}` : ""}`}
+          cor="text-slate-100"
+          acao={
+            <button
+              type="button"
+              onClick={() => { setNovoSp(String(alvo).replace(".", ",")); setEditando(true); }}
+              className="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-emerald-400"
+              aria-label={`Alterar setpoint do ${f.forno}`}
+              title="Alterar setpoint"
+            >
+              <Pencil size={13} />
+            </button>
+          }
         />
         <Medida
           icone={<Timer size={14} />}
@@ -75,63 +230,80 @@ function CartaoForno({ f, agora }: { f: EstadoForno; agora: number }) {
         />
       </div>
 
-      <div className={`mt-3 rounded-lg border-2 p-3 ${estilo.caixa}`}>
-        <div className="flex items-center justify-between gap-3">
-          <div className={`flex items-center gap-2 text-xl font-black ${estilo.texto}`}>
-            <Icone size={22} />
-            {TEXTO_ACAO[s.acao] || s.acao.toUpperCase()}
-          </div>
-          {s.velocidade_sugerida_hz !== null && (
-            <div className="text-right">
-              <div className={`font-mono text-2xl font-black ${estilo.texto}`}>{fmt(s.velocidade_sugerida_hz)} Hz</div>
-              {s.delta_hz !== null && Math.abs(s.delta_hz) >= 0.05 && (
-                <div className="font-mono text-xs text-slate-400">
-                  {s.delta_hz > 0 ? "+" : ""}
-                  {fmt(s.delta_hz)} Hz
-                </div>
-              )}
+      {modo === "linha_base" ? (
+        <div className="mt-3 rounded-lg border border-dashed border-slate-700 bg-slate-900/40 p-3 text-sm text-slate-400">
+          <span className="font-bold text-slate-300">Registrando a linha de base.</span> Opere o forno como de
+          costume: as sugestões ficam ocultas até o comparativo "antes" estar completo.
+        </div>
+      ) : (
+        <div className={`mt-3 rounded-lg border-2 p-3 ${estilo.caixa}`}>
+          <div className="flex items-center justify-between gap-3">
+            <div className={`flex items-center gap-2 text-xl font-black ${estilo.texto}`}>
+              <Icone size={22} />
+              {TEXTO_ACAO[s.acao] || s.acao.toUpperCase()}
             </div>
+            {s.velocidade_sugerida_hz !== null && (
+              <div className="text-right">
+                <div className={`font-mono text-2xl font-black ${estilo.texto}`}>{fmt(s.velocidade_sugerida_hz)} Hz</div>
+                {s.delta_hz !== null && Math.abs(s.delta_hz) >= 0.05 && (
+                  <div className="font-mono text-xs text-slate-400">
+                    {s.delta_hz > 0 ? "+" : ""}
+                    {fmt(s.delta_hz)} Hz
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <p className="mt-2 text-sm leading-snug text-slate-300">{s.motivo}</p>
+          {s.avisos?.length > 0 && (
+            <ul className="mt-2 space-y-1">
+              {s.avisos.map((a) => (
+                <li key={a} className="flex items-start gap-1.5 text-xs text-amber-300/90">
+                  <AlertTriangle size={13} className="mt-0.5 shrink-0" /> {a}
+                </li>
+              ))}
+            </ul>
           )}
         </div>
-        <p className="mt-2 text-sm leading-snug text-slate-300">{s.motivo}</p>
-        {s.avisos?.length > 0 && (
-          <ul className="mt-2 space-y-1">
-            {s.avisos.map((a) => (
-              <li key={a} className="flex items-start gap-1.5 text-xs text-amber-300/90">
-                <AlertTriangle size={13} className="mt-0.5 shrink-0" /> {a}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      )}
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
-        <span>Modo conselheiro: ajuste a rotação na IHM.</span>
+        <span>{modo === "linha_base" ? "Nada é enviado ao CLP." : "Modo conselheiro: ajuste a rotação na IHM."}</span>
         <span title={f.modelo.motivo}>
-          K {fmt(s.ganho_k, 2)} %/Hz{" "}
-          {f.modelo.k !== null && `· dados: ${fmt(f.modelo.k, 2)} (${f.modelo.n} am.${f.modelo.confiavel ? ", confiável" : ""})`}
+          K {fmt(s.ganho_k, 2)} %/Hz
+          {f.modelo.k !== null && ` · dados: ${fmt(f.modelo.k, 2)} (${f.modelo.n} am.${f.modelo.confiavel ? ", confiável" : ""})`}
         </span>
       </div>
+
+      {editando && (
+        <ModalSupervisor
+          titulo={`Setpoint de umidade · ${f.forno}`}
+          pinExigido={pinExigido}
+          aoFechar={() => setEditando(false)}
+          aoConfirmar={salvarSetpoint}
+          textoConfirmar="Salvar setpoint"
+        >
+          <Campo rotulo={`Umidade alvo (%) · entre ${fmt(f.parametros.setpoint_min)} e ${fmt(f.parametros.setpoint_max)}`}>
+            <input
+              value={novoSp}
+              onChange={(e) => setNovoSp(e.target.value)}
+              inputMode="decimal"
+              autoFocus
+              className={`${CLASSE_INPUT} font-mono text-lg font-bold`}
+            />
+          </Campo>
+        </ModalSupervisor>
+      )}
     </div>
   );
 }
 
-function Medida({ icone, rotulo, valor, detalhe, cor }: { icone: ReactNode; rotulo: string; valor: string; detalhe?: string; cor: string }) {
-  return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-2">
-      <div className="flex items-center gap-1 text-[10px] font-bold uppercase text-slate-500">
-        {icone} {rotulo}
-      </div>
-      <div className={`font-mono text-lg font-bold ${cor}`}>{valor}</div>
-      {detalhe && <div className="font-mono text-[11px] text-slate-500">{detalhe}</div>}
-    </div>
-  );
-}
-
+// ------------------------------------------------------------------ painel
 export function PainelFornos({ atualizar = 0 }: { atualizar?: number }) {
   const [estado, setEstado] = useState<EstadoGeral | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [agora, setAgora] = useState(Date.now());
+  const [trocandoModo, setTrocandoModo] = useState(false);
 
   const carregar = useCallback(async () => {
     try {
@@ -153,15 +325,34 @@ export function PainelFornos({ atualizar = 0 }: { atualizar?: number }) {
   if (!estado) {
     return (
       <div className="mb-6 rounded-xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-500">
-        {erro ? `Sugestão de rotação indisponível (${erro}).` : "Carregando fornos..."}
+        {erro ? `Controle de umidade indisponível (${erro}).` : "Carregando fornos..."}
       </div>
     );
   }
 
+  const modo = estado.modo.modo;
+  const outroModo: Modo = modo === "linha_base" ? "conselheiro" : "linha_base";
+
   return (
     <section className="mb-6">
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400">Controle de umidade · fornos</h2>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400">Controle de umidade · fornos</h2>
+          <button
+            type="button"
+            onClick={() => setTrocandoModo(true)}
+            title="Alterar modo de operação"
+            className={`rounded-full border px-3 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
+              modo === "linha_base"
+                ? "border-slate-600 bg-slate-800 text-slate-300 hover:border-slate-400"
+                : "border-emerald-600/60 bg-emerald-500/10 text-emerald-400 hover:border-emerald-400"
+            }`}
+          >
+            {modo === "linha_base" ? "● " : "◆ "}
+            {TEXTO_MODO[modo]}
+            {estado.modo.alterado_em && ` · desde ${dataLocal(estado.modo.alterado_em)}`}
+          </button>
+        </div>
         <div className="flex items-center gap-3 text-xs">
           {(erro || estado.coleta.ultimo_erro) && (
             <span className="flex items-center gap-1 text-amber-400" title={erro || estado.coleta.ultimo_erro || ""}>
@@ -178,9 +369,28 @@ export function PainelFornos({ atualizar = 0 }: { atualizar?: number }) {
       </div>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         {estado.fornos.map((f) => (
-          <CartaoForno key={f.forno} f={f} agora={agora} />
+          <CartaoForno key={f.forno} f={f} agora={agora} modo={modo} pinExigido={estado.pin_exigido} aoAtualizar={carregar} />
         ))}
       </div>
+
+      {trocandoModo && (
+        <ModalSupervisor
+          titulo={`Mudar para "${TEXTO_MODO[outroModo]}"`}
+          pinExigido={estado.pin_exigido}
+          aoFechar={() => setTrocandoModo(false)}
+          aoConfirmar={async (usuario, pin, motivo) => {
+            await umidadeApi.alterarModo(outroModo, usuario, pin, motivo || undefined);
+            await carregar();
+          }}
+          textoConfirmar={`Mudar para ${TEXTO_MODO[outroModo]}`}
+        >
+          <p className="text-sm leading-snug text-slate-400">
+            {outroModo === "conselheiro"
+              ? "Os operadores passam a ver a rotação sugerida. A data de hoje marca o fim do período \"antes\" no comparativo."
+              : "As sugestões ficam ocultas e os dados voltam a contar como linha de base (\"antes\")."}
+          </p>
+        </ModalSupervisor>
+      )}
     </section>
   );
 }

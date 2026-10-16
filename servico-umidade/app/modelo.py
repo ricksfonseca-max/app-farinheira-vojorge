@@ -43,6 +43,7 @@ class LeituraProcesso:
     pressao_bar: float | None
     rodando: bool
     lido_em: datetime | None
+    temp_saida_c: float | None = None    # PT100 na saída do produto (futuro)
 
 
 @dataclass(frozen=True)

@@ -21,6 +21,10 @@ services:
       FUSO_HORARIO_PADRAO: "-03:00"
       # Se definir, configure o mesmo valor em VITE_TOKEN_UMIDADE no build do app.
       TOKEN_API: ""
+      # PIN pedido na tela para alterar setpoint e modo. TROQUE antes de subir.
+      SENHA_SUPERVISOR: "trocar-este-pin"
+      # Modo no primeiro start: linha_base (só registra, para o "antes") ou conselheiro
+      MODO_INICIAL: "linha_base"
     volumes:
       - dados-umidade:/dados
       - ./servico-umidade/config/fornos.json:/app/config/fornos.json:ro

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hmac
 import math
 import threading
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from typing import Callable
 
@@ -15,6 +17,8 @@ from .modelo import EstadoControle, LeituraProcesso, Sugestao
 from .vapor import tsat_pressao_manometrica
 
 ACOES_AVALIAVEIS = {modelo.AUMENTAR, modelo.REDUZIR, modelo.MANTER}
+MODOS = ("linha_base", "conselheiro")
+TEXTO_MODO = {"linha_base": "Linha de base", "conselheiro": "Conselheiro"}
 
 
 def ler_data(valor, fuso_padrao: timezone) -> datetime | None:
@@ -50,6 +54,90 @@ class ServicoUmidade:
         self._ultima_sug_gravada: dict[str, tuple[str, float | None]] = {}
         self.ultima_coleta_ok: datetime | None = None
         self.ultimo_erro_coleta: str | None = None
+        # Registra o início da coleta: é o marco zero do comparativo "antes × depois".
+        if self.banco.um("SELECT id FROM modos LIMIT 1") is None:
+            inicial = cfg.modo_inicial if cfg.modo_inicial in MODOS else "linha_base"
+            self.banco.inserir("modos", {"modo": inicial, "alterado_por": "sistema",
+                                         "motivo": "início da coleta", "alterado_em": iso(self.relogio())})
+
+    # ------------------------------------------------------ setpoint e modo
+    def params(self, forno: str) -> ParametrosForno:
+        """Parâmetros do forno com o setpoint em vigor (o da tela vence o do fornos.json)."""
+        p = self.fornos[forno]
+        r = self.banco.um(
+            "SELECT umidade_alvo FROM setpoints WHERE forno = ? ORDER BY id DESC LIMIT 1", (forno,))
+        return replace(p, umidade_alvo=r["umidade_alvo"]) if r else p
+
+    def setpoint_atual(self, forno: str) -> dict:
+        r = self.banco.um("SELECT * FROM setpoints WHERE forno = ? ORDER BY id DESC LIMIT 1", (forno,))
+        if r:
+            return {"umidade_alvo": r["umidade_alvo"], "alterado_em": r["alterado_em"],
+                    "alterado_por": r["alterado_por"], "origem": "tela"}
+        return {"umidade_alvo": self.fornos[forno].umidade_alvo, "alterado_em": None,
+                "alterado_por": None, "origem": "configuracao"}
+
+    def conferir_pin(self, pin) -> bool:
+        if not self.cfg.senha_supervisor:
+            return True
+        return hmac.compare_digest(str(pin or "").encode(), self.cfg.senha_supervisor.encode())
+
+    def alterar_setpoint(self, forno: str, valor, usuario: str | None, motivo: str | None = None) -> dict:
+        nome = normalizar_forno(forno, self.fornos)
+        if nome is None:
+            raise ValueError(f"Forno desconhecido: {forno!r}")
+        base = self.fornos[nome]
+        try:
+            valor = round(float(str(valor).replace(",", ".")), 2)
+        except (TypeError, ValueError):
+            raise ValueError("Setpoint inválido") from None
+        if not (base.setpoint_min <= valor <= base.setpoint_max):
+            raise ValueError(f"Setpoint deve ficar entre {base.setpoint_min:g} e {base.setpoint_max:g} %".replace(".", ","))
+        usuario = (usuario or "").strip()[:60]
+        if not usuario:
+            raise ValueError("Informe quem está alterando o setpoint")
+        with self._trava:
+            agora = self.relogio()
+            self.banco.inserir("setpoints", {"forno": nome, "umidade_alvo": valor, "alterado_por": usuario,
+                                             "motivo": (motivo or "").strip()[:200] or None,
+                                             "alterado_em": iso(agora)})
+            self._reaplicar_ultima_amostra(nome, agora, valor)
+            return self.estado_forno(nome)
+
+    def _reaplicar_ultima_amostra(self, nome: str, agora: datetime, novo_alvo: float) -> None:
+        """Com setpoint novo, refaz a correção da última amostra (se ainda for recente)."""
+        ultima = self._ultima_umidade(nome)
+        if not ultima:
+            return
+        est, v_ref = self._carregar_estado(nome)
+        sug, novo = modelo.sugerir_por_amostra(
+            self.params(nome), self._leituras.get(nome), est, ultima["umidade"], de_iso(ultima["coletada_em"]),
+            agora, self.ganho_k(nome), self.cfg.leitura_validade_s, base_janela_hz=ultima["base_media_janela"])
+        if sug.acao in (modelo.AMOSTRA_ANTIGA, modelo.AMOSTRA_INVALIDA):
+            return
+        sug.origem = "setpoint"
+        sug.motivo = f"Setpoint alterado para {novo_alvo:.1f}%. ".replace(".", ",", 1) + sug.motivo
+        self._salvar_estado(nome, novo, v_ref)
+        self._gravar_sugestao(sug, ultima["id"])
+        self._ultima_sug_gravada[nome] = (sug.acao, sug.velocidade_sugerida_hz)
+
+    def modo_atual(self) -> dict:
+        r = self.banco.um("SELECT * FROM modos ORDER BY id DESC LIMIT 1")
+        modo = r["modo"] if r else "linha_base"
+        return {"modo": modo, "texto": TEXTO_MODO.get(modo, modo),
+                "alterado_em": r["alterado_em"] if r else None, "alterado_por": r["alterado_por"] if r else None}
+
+    def alterar_modo(self, modo: str, usuario: str | None, motivo: str | None = None) -> dict:
+        if modo not in MODOS:
+            raise ValueError(f"Modo inválido. Use: {', '.join(MODOS)}")
+        usuario = (usuario or "").strip()[:60]
+        if not usuario:
+            raise ValueError("Informe quem está alterando o modo")
+        with self._trava:
+            if self.modo_atual()["modo"] != modo:
+                self.banco.inserir("modos", {"modo": modo, "alterado_por": usuario,
+                                             "motivo": (motivo or "").strip()[:200] or None,
+                                             "alterado_em": iso(self.relogio())})
+            return self.modo_atual()
 
     # ------------------------------------------------------------------ estado
     def _carregar_estado(self, forno: str) -> tuple[EstadoControle, float | None]:
@@ -89,6 +177,7 @@ class ServicoUmidade:
         pressao_bar: float | None,
         rodando: bool,
         lido_em: datetime | None = None,
+        temp_saida_c: float | None = None,
     ) -> bool:
         nome = normalizar_forno(forno, self.fornos)
         if nome is None:
@@ -100,8 +189,9 @@ class ServicoUmidade:
             self.banco.inserir("leituras", {
                 "forno": nome, "lido_em": iso(lido_em), "velocidade_hz": velocidade_hz,
                 "pressao_bar": pressao_bar, "tsat_c": tsat, "rodando": int(bool(rodando)),
+                "temp_saida_c": temp_saida_c,
             })
-            self._leituras[nome] = LeituraProcesso(velocidade_hz, pressao_bar, bool(rodando), lido_em)
+            self._leituras[nome] = LeituraProcesso(velocidade_hz, pressao_bar, bool(rodando), lido_em, temp_saida_c)
 
             # Detecta mudança de rotação (começa a contar o tempo de espera).
             # v_ref: None = desconhecido (serviço acabou de iniciar), 0 = forno estava parado.
@@ -195,7 +285,7 @@ class ServicoUmidade:
         if not math.isfinite(umidade):
             raise ValueError("Umidade inválida")
 
-        p = self.fornos[nome]
+        p = self.params(nome)
         agora = self.relogio()
         coletada_em = coletada_em or agora
         if coletada_em > agora + timedelta(minutes=5):
@@ -218,7 +308,9 @@ class ServicoUmidade:
                 "chave": chave, "tipo_farinha": tipo_farinha, "peneira": peneira,
                 "responsavel": responsavel, "registro_id": None if registro_id is None else str(registro_id),
                 "velocidade_hz": no_momento.get("velocidade_hz"), "pressao_bar": no_momento.get("pressao_bar"),
-                "tsat_c": no_momento.get("tsat_c"), "recebida_em": iso(agora), **janela,
+                "tsat_c": no_momento.get("tsat_c"), "temp_saida_c": no_momento.get("temp_saida_c"),
+                "umidade_alvo": p.umidade_alvo, "modo": self.modo_atual()["modo"],
+                "recebida_em": iso(agora), **janela,
             })
 
             est, v_ref = self._carregar_estado(nome)
@@ -234,7 +326,8 @@ class ServicoUmidade:
             self._salvar_estado(nome, novo, v_ref)
             self._gravar_sugestao(sug, amostra_id)
             self._ultima_sug_gravada[nome] = (sug.acao, sug.velocidade_sugerida_hz)
-            return {"amostra_id": amostra_id, "duplicada": False, "sugestao": sug.como_dict()}
+            return {"amostra_id": amostra_id, "duplicada": False, "sugestao": sug.como_dict(),
+                    "modo": self.modo_atual()["modo"]}
 
     def sincronizar_registros(self, registros: list[dict]) -> int:
         """Importa apontamentos do Node-RED que não chegaram pelo app (rede caiu, etc.)."""
@@ -282,7 +375,7 @@ class ServicoUmidade:
             "SELECT * FROM amostras WHERE forno = ? ORDER BY coletada_em DESC LIMIT 1", (forno,))
 
     def sugestao_atual(self, forno: str) -> Sugestao:
-        p = self.fornos[forno]
+        p = self.params(forno)
         est, _ = self._carregar_estado(forno)
         ultima = self._ultima_umidade(forno)
         sug = modelo.sugerir_por_vapor(
@@ -299,6 +392,7 @@ class ServicoUmidade:
             "tsat_c": sug.tsat_c, "fator_vapor": sug.fator_vapor, "umidade": sug.umidade,
             "umidade_alvo": sug.umidade_alvo, "erro": sug.erro, "delta_hz": sug.delta_hz,
             "ganho_k": sug.ganho_k, "amostra_id": amostra_id, "avisos": json_avisos(sug.avisos),
+            "modo": self.modo_atual()["modo"],
         })
 
     def atualizar_sugestoes_vapor(self) -> None:
@@ -349,7 +443,7 @@ class ServicoUmidade:
 
     # ------------------------------------------------------------------ painel
     def estado_forno(self, nome: str) -> dict:
-        p = self.fornos[nome]
+        p = self.params(nome)
         leitura = self._leituras.get(nome)
         est, _ = self._carregar_estado(nome)
         ultima = self._ultima_umidade(nome)
@@ -365,7 +459,9 @@ class ServicoUmidade:
                 "tsat_c": _arred(tsat_pressao_manometrica(leitura.pressao_bar), 2),
                 "rodando": leitura.rodando,
                 "lido_em": iso(leitura.lido_em),
+                "temp_saida_c": leitura.temp_saida_c,
             },
+            "setpoint": self.setpoint_atual(nome),
             "ultima_amostra": None if ultima is None else {
                 "umidade": ultima["umidade"], "coletada_em": ultima["coletada_em"],
                 "responsavel": ultima["responsavel"], "tipo_farinha": ultima["tipo_farinha"],
@@ -377,6 +473,8 @@ class ServicoUmidade:
                 "f_min_hz": p.f_min_hz, "f_max_hz": p.f_max_hz,
                 "ganho_k": p.ganho_k, "usar_k_aprendido": p.usar_k_aprendido,
                 "t_residencia_min": p.t_residencia_min, "intervalo_amostra_min": p.intervalo_amostra_min,
+                "setpoint_min": p.setpoint_min, "setpoint_max": p.setpoint_max,
+                "faixa_qualidade": p.faixa_qualidade,
             },
             "modelo": self.estimativa_k(nome).como_dict(),
         }
@@ -386,8 +484,108 @@ class ServicoUmidade:
             return {
                 "agora": iso(self.relogio()),
                 "coleta": {"ultima_ok": iso(self.ultima_coleta_ok), "ultimo_erro": self.ultimo_erro_coleta},
+                "modo": self.modo_atual(),
+                "pin_exigido": bool(self.cfg.senha_supervisor),
                 "fornos": [self.estado_forno(n) for n in self.fornos],
             }
+
+    # ---------------------------------------------------------------- séries
+    def _valor_em(self, tabela: str, coluna: str, quando: datetime, forno: str | None = None):
+        sql = f"SELECT {coluna} FROM {tabela} WHERE alterado_em <= ?"
+        params: list = [iso(quando)]
+        if forno:
+            sql += " AND forno = ?"
+            params.append(forno)
+        r = self.banco.um(sql + " ORDER BY alterado_em DESC, id DESC LIMIT 1", tuple(params))
+        return r[coluna] if r else None
+
+    def series(self, forno: str, horas: float = 24) -> dict:
+        """Dados dos gráficos: leituras agregadas, amostras, setpoint, sugestões e modo."""
+        nome = normalizar_forno(forno, self.fornos)
+        if nome is None:
+            raise ValueError(f"Forno desconhecido: {forno!r}")
+        horas = min(max(float(horas), 1.0), 24 * 90)
+        agora = self.relogio()
+        inicio = agora - timedelta(hours=horas)
+        passo_min = 1 if horas <= 6 else 5 if horas <= 48 else 15 if horas <= 24 * 8 else 60
+        passo_s = passo_min * 60
+        ms = lambda texto: int(de_iso(texto).timestamp() * 1000)  # noqa: E731
+
+        leituras = self.banco.consultar(
+            """SELECT CAST(strftime('%s', lido_em) AS INTEGER) / ? AS bloco,
+                      AVG(CASE WHEN rodando = 1 THEN velocidade_hz END) AS velocidade_hz,
+                      AVG(pressao_bar) AS pressao_bar, AVG(tsat_c) AS tsat_c,
+                      AVG(temp_saida_c) AS temp_saida_c, MAX(rodando) AS rodando
+               FROM leituras WHERE forno = ? AND lido_em >= ? GROUP BY bloco ORDER BY bloco""",
+            (passo_s, nome, iso(inicio)),
+        )
+        serie_leituras = [{
+            "t": (r["bloco"] * passo_s + passo_s // 2) * 1000,
+            "velocidade_hz": _arred(r["velocidade_hz"], 2), "pressao_bar": _arred(r["pressao_bar"], 2),
+            "tsat_c": _arred(r["tsat_c"], 1), "temp_saida_c": _arred(r["temp_saida_c"], 1),
+            "rodando": bool(r["rodando"]),
+        } for r in leituras]
+
+        amostras = [{
+            "t": ms(r["coletada_em"]), "umidade": r["umidade"], "umidade_alvo": r["umidade_alvo"],
+            "responsavel": r["responsavel"], "tipo_farinha": r["tipo_farinha"], "origem": r["origem"],
+        } for r in self.banco.consultar(
+            """SELECT coletada_em, umidade, umidade_alvo, responsavel, tipo_farinha, origem FROM amostras
+               WHERE forno = ? AND coletada_em >= ? ORDER BY coletada_em""", (nome, iso(inicio)))]
+
+        sugestoes = [{
+            "t": ms(r["calculada_em"]), "velocidade_sugerida_hz": _arred(r["velocidade_sugerida_hz"], 2),
+            "acao": r["acao"], "origem": r["origem"], "aplicada": r["aplicada"], "modo": r["modo"],
+        } for r in self.banco.consultar(
+            """SELECT calculada_em, velocidade_sugerida_hz, acao, origem, aplicada, modo FROM sugestoes
+               WHERE forno = ? AND calculada_em >= ? AND velocidade_sugerida_hz IS NOT NULL
+               ORDER BY calculada_em LIMIT 20000""", (nome, iso(inicio)))]
+
+        alvo_inicio = self._valor_em("setpoints", "umidade_alvo", inicio, nome) or self.fornos[nome].umidade_alvo
+        setpoints = [{"t": int(inicio.timestamp() * 1000), "umidade_alvo": alvo_inicio, "alterado_por": None}]
+        setpoints += [{"t": ms(r["alterado_em"]), "umidade_alvo": r["umidade_alvo"], "alterado_por": r["alterado_por"]}
+                      for r in self.banco.consultar(
+                          "SELECT * FROM setpoints WHERE forno = ? AND alterado_em > ? ORDER BY alterado_em, id",
+                          (nome, iso(inicio)))]
+
+        modo_inicio = self._valor_em("modos", "modo", inicio) or "linha_base"
+        modos = [{"t": int(inicio.timestamp() * 1000), "modo": modo_inicio}]
+        modos += [{"t": ms(r["alterado_em"]), "modo": r["modo"]} for r in self.banco.consultar(
+            "SELECT * FROM modos WHERE alterado_em > ? ORDER BY alterado_em, id", (iso(inicio),))]
+
+        return {
+            "forno": nome, "inicio": int(inicio.timestamp() * 1000), "fim": int(agora.timestamp() * 1000),
+            "passo_min": passo_min, "faixa_qualidade": self.fornos[nome].faixa_qualidade,
+            "leituras": serie_leituras, "amostras": amostras, "sugestoes": sugestoes,
+            "setpoints": setpoints, "modos": modos,
+            "resumo": self.resumo_umidade(nome, inicio, agora),
+        }
+
+    def resumo_umidade(self, forno: str, inicio: datetime, fim: datetime) -> dict:
+        """Indicadores de qualidade da umidade no período (geral e por modo de operação)."""
+        p = self.fornos[forno]
+        linhas = self.banco.consultar(
+            """SELECT umidade, umidade_alvo, modo FROM amostras
+               WHERE forno = ? AND coletada_em >= ? AND coletada_em <= ? AND umidade BETWEEN ? AND ?""",
+            (forno, iso(inicio), iso(fim), p.umidade_min_valida, p.umidade_max_valida),
+        )
+
+        def calcular(rs: list[dict]) -> dict:
+            n = len(rs)
+            if n == 0:
+                return {"n": 0, "media": None, "desvio": None, "erro_medio_abs": None, "dentro_faixa_pct": None}
+            us = [r["umidade"] for r in rs]
+            erros = [r["umidade"] - (r["umidade_alvo"] if r["umidade_alvo"] is not None else p.umidade_alvo)
+                     for r in rs]
+            media = sum(us) / n
+            desvio = math.sqrt(sum((u - media) ** 2 for u in us) / (n - 1)) if n > 1 else None
+            dentro = sum(1 for e in erros if abs(e) <= p.faixa_qualidade + 1e-9)
+            return {"n": n, "media": round(media, 2), "desvio": None if desvio is None else round(desvio, 2),
+                    "erro_medio_abs": round(sum(abs(e) for e in erros) / n, 2),
+                    "dentro_faixa_pct": round(100 * dentro / n, 1)}
+
+        por_modo = {m: calcular([r for r in linhas if (r["modo"] or "linha_base") == m]) for m in MODOS}
+        return {"geral": calcular(linhas), "por_modo": por_modo, "faixa_qualidade": p.faixa_qualidade}
 
 
 def _arred(v: float | None, casas: int) -> float | None:

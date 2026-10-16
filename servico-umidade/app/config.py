@@ -31,6 +31,9 @@ class ParametrosForno:
     limiar_mudanca_hz: float = 0.5      # variação de rotação considerada "mudança"
     usar_k_aprendido: bool = False      # usa o K estimado pelos dados quando confiável
     intervalo_amostra_min: float = 20.0 # rotina de coleta do operador
+    faixa_qualidade: float = 0.5        # ± em torno do setpoint aceito como "dentro" (indicadores)
+    setpoint_min: float = 5.0           # faixa permitida para o setpoint editado na tela
+    setpoint_max: float = 20.0
 
 
 _CAMPOS = {f.name for f in fields(ParametrosForno)} - {"nome"}
@@ -75,6 +78,10 @@ def _validar(p: ParametrosForno) -> None:
         erros.append("tsat_ref_c deve ser pelo menos 10 °C maior que t_produto_c")
     if not (p.umidade_min_valida < p.umidade_alvo < p.umidade_max_valida):
         erros.append("umidade_alvo deve estar dentro da faixa válida")
+    if not (p.umidade_min_valida <= p.setpoint_min < p.setpoint_max <= p.umidade_max_valida):
+        erros.append("setpoint_min/setpoint_max devem estar dentro da faixa válida")
+    elif not (p.setpoint_min <= p.umidade_alvo <= p.setpoint_max):
+        erros.append("umidade_alvo deve estar entre setpoint_min e setpoint_max")
     if erros:
         raise ValueError(f"{p.nome}: " + "; ".join(erros))
 
@@ -119,6 +126,8 @@ class ConfigServico:
     cors_origem: str = "*"
     fuso_padrao: timezone = field(default_factory=lambda: _fuso("-03:00"))
     config_fornos: str = "/app/config/fornos.json"
+    senha_supervisor: str = ""          # PIN para alterar setpoint e modo (vazio = sem PIN)
+    modo_inicial: str = "linha_base"    # linha_base | conselheiro
 
     @classmethod
     def do_ambiente(cls) -> "ConfigServico":
@@ -138,4 +147,6 @@ class ConfigServico:
             cors_origem=e("CORS_ORIGEM", "*"),
             fuso_padrao=_fuso(e("FUSO_HORARIO_PADRAO", "-03:00")),
             config_fornos=e("CONFIG_FORNOS", "/app/config/fornos.json"),
+            senha_supervisor=e("SENHA_SUPERVISOR", ""),
+            modo_inicial=e("MODO_INICIAL", "linha_base"),
         )
