@@ -8,7 +8,8 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 from app import modelo
-from app.banco import Banco
+from app.banco import Banco  # noqa: F401
+from tests.base import banco_teste
 from app.config import ConfigServico, ParametrosForno
 from app.servico import ServicoUmidade
 from app.servidor import criar_servidor
@@ -28,7 +29,7 @@ def novo(pin=""):
     relogio = Relogio(T0)
     fornos = {"Forno 01": ParametrosForno(nome="Forno 01"), "Forno 02": ParametrosForno(nome="Forno 02")}
     cfg = ConfigServico(intervalo_leitura_s=15, senha_supervisor=pin)
-    return ServicoUmidade(cfg, fornos, Banco(":memory:"), relogio), relogio
+    return ServicoUmidade(cfg, fornos, banco_teste(), relogio), relogio
 
 
 def semear(s, relogio, minutos=40, v=40.0, p=8.0, temp=None):

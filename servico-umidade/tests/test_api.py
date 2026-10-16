@@ -8,7 +8,8 @@ import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from app.banco import Banco
+from app.banco import Banco  # noqa: F401
+from tests.base import banco_teste
 from app.coletor import Coletor, interpretar_fornos
 from app.config import ConfigServico, carregar_fornos
 from app.servico import ServicoUmidade
@@ -61,7 +62,7 @@ class TestApi(unittest.TestCase):
         )
         import os
         fornos = carregar_fornos(os.path.join(os.path.dirname(__file__), "..", "config", "fornos.json"))
-        cls.servico = ServicoUmidade(cfg, fornos, Banco(":memory:"))
+        cls.servico = ServicoUmidade(cfg, fornos, banco_teste())
         cls.coletor = Coletor(cls.servico)
         cls.coletor._parar.wait = lambda t=None: time.sleep(min(t or 0, 0.2)) or cls.coletor._parar.is_set()
         cls.api = criar_servidor(cls.servico, "127.0.0.1", 0)

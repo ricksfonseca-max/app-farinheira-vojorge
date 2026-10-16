@@ -5,7 +5,8 @@ from collections import deque
 from datetime import datetime, timedelta, timezone
 
 from app import modelo
-from app.banco import Banco
+from app.banco import Banco  # noqa: F401
+from tests.base import banco_teste
 from app.config import ConfigServico, ParametrosForno
 from app.modelo import fator_vapor
 from app.servico import ServicoUmidade, ler_data
@@ -52,7 +53,7 @@ def novo_servico(p=None):
     p = p or ParametrosForno(nome="Forno 01")
     relogio = Relogio(T0)
     cfg = ConfigServico(intervalo_leitura_s=PASSO_S, leitura_validade_s=120, janela_aplicacao_min=15)
-    return ServicoUmidade(cfg, {"Forno 01": p}, Banco(":memory:"), relogio), relogio, p
+    return ServicoUmidade(cfg, {"Forno 01": p}, banco_teste(), relogio), relogio, p
 
 
 class TestSimulacao(unittest.TestCase):

@@ -83,5 +83,58 @@
     "wires": [
       []
     ]
+  },
+  {
+    "id": "f0a1c0de00000007",
+    "type": "comment",
+    "z": "f0a1c0de00000001",
+    "name": "OPCIONAL: Redis em vez de HTTP — ligue 'Prepara SET no Redis' a um nó redis-command (SET)",
+    "info": "Use FONTE_PROCESSO_URL=redis://redis:6379/3?chave=umidade:fornos no serviço.",
+    "x": 360,
+    "y": 300,
+    "wires": []
+  },
+  {
+    "id": "f0a1c0de00000008",
+    "type": "inject",
+    "z": "f0a1c0de00000001",
+    "name": "a cada 5 s",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "5",
+    "crontab": "",
+    "once": true,
+    "onceDelay": "5",
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 150,
+    "y": 340,
+    "wires": [
+      [
+        "f0a1c0de00000009"
+      ]
+    ]
+  },
+  {
+    "id": "f0a1c0de00000009",
+    "type": "function",
+    "z": "f0a1c0de00000001",
+    "name": "Prepara SET no Redis",
+    "func": "// Publica o estado dos fornos no Redis (alternativa ao GET /api/fornos).\n// Os valores vêm das variáveis globais gravadas pelo nó \"Escala leitura Modbus\".\nconst agora = Date.now();\nconst VALIDADE_MS = 30000; // sem atualização há mais de 30 s = leitura inválida\n\nfunction forno(nome, prefixo) {\n    const lidoEm = global.get(prefixo + '_lido_em') || 0;\n    const velho = (agora - lidoEm) > VALIDADE_MS;\n    return {\n        forno: nome,\n        velocidade_hz: velho ? null : global.get(prefixo + '_hz'),\n        rosca_hz: velho ? null : (global.get(prefixo + '_rosca_hz') ?? null),\n        pressao_vapor_bar: velho ? null : global.get(prefixo + '_pressao_bar'),\n        rodando: !velho && !!global.get(prefixo + '_rodando'),\n        // PT100 na saída do produto: fica null até o sensor ser instalado\n        temp_saida_produto_c: velho ? null : (global.get(prefixo + '_temp_saida_c') ?? null),\n        lido_em: lidoEm ? new Date(lidoEm).toISOString() : null\n    };\n}\n\n// Grava o mesmo JSON do /api/fornos no Redis, com validade de 30 s.\n// Ligue a saída num nó \"redis-command\" (node-red-contrib-redis) com o comando SET.\nconst estado = {\n    fornos: [forno('Forno 01', 'forno1'), forno('Forno 02', 'forno2')],\n    ts: new Date(agora).toISOString()\n};\nmsg.payload = ['umidade:fornos', JSON.stringify(estado), 'EX', '30'];\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 370,
+    "y": 340,
+    "wires": [
+      []
+    ]
   }
 ]

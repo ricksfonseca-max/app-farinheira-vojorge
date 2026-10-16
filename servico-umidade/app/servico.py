@@ -154,20 +154,12 @@ class ServicoUmidade:
         return est, r["velocidade_referencia_hz"]
 
     def _salvar_estado(self, forno: str, est: EstadoControle, v_ref: float | None) -> None:
-        self.banco.executar(
-            """INSERT INTO estado_forno (forno, base_alvo_hz, fator_ref, definido_em,
-                   ultima_amostra_em, ultima_mudanca_velocidade_em, velocidade_referencia_hz)
-               VALUES (?, ?, ?, ?, ?, ?, ?)
-               ON CONFLICT (forno) DO UPDATE SET
-                   base_alvo_hz = excluded.base_alvo_hz,
-                   fator_ref = excluded.fator_ref,
-                   definido_em = excluded.definido_em,
-                   ultima_amostra_em = excluded.ultima_amostra_em,
-                   ultima_mudanca_velocidade_em = excluded.ultima_mudanca_velocidade_em,
-                   velocidade_referencia_hz = excluded.velocidade_referencia_hz""",
-            (forno, est.base_alvo_hz, est.fator_ref, iso(est.definido_em), iso(est.ultima_amostra_em),
-             iso(est.ultima_mudanca_velocidade_em), v_ref),
-        )
+        self.banco.upsert("estado_forno", {
+            "forno": forno, "base_alvo_hz": est.base_alvo_hz, "fator_ref": est.fator_ref,
+            "definido_em": iso(est.definido_em), "ultima_amostra_em": iso(est.ultima_amostra_em),
+            "ultima_mudanca_velocidade_em": iso(est.ultima_mudanca_velocidade_em),
+            "velocidade_referencia_hz": v_ref,
+        }, chave="forno")
 
     # --------------------------------------------------------------- leituras
     def registrar_leitura(
@@ -188,7 +180,8 @@ class ServicoUmidade:
         with self._trava:
             tsat = tsat_pressao_manometrica(pressao_bar)
             self.banco.inserir("leituras", {
-                "forno": nome, "lido_em": iso(lido_em), "velocidade_hz": velocidade_hz,
+                "forno": nome, "lido_em": iso(lido_em), "lido_ts": int(lido_em.timestamp()),
+                "velocidade_hz": velocidade_hz,
                 "pressao_bar": pressao_bar, "tsat_c": tsat, "rodando": int(bool(rodando)),
                 "temp_saida_c": temp_saida_c, "alimentacao_hz": alimentacao_hz,
             })
@@ -520,13 +513,13 @@ class ServicoUmidade:
         ms = lambda texto: int(de_iso(texto).timestamp() * 1000)  # noqa: E731
 
         leituras = self.banco.consultar(
-            """SELECT CAST(strftime('%s', lido_em) AS INTEGER) / ? AS bloco,
+            f"""SELECT {self.banco.bloco_tempo("lido_ts", passo_s)} AS bloco,
                       AVG(CASE WHEN rodando = 1 THEN velocidade_hz END) AS velocidade_hz,
                       AVG(pressao_bar) AS pressao_bar, AVG(tsat_c) AS tsat_c,
                       AVG(temp_saida_c) AS temp_saida_c, AVG(alimentacao_hz) AS alimentacao_hz,
                       MAX(rodando) AS rodando
-               FROM leituras WHERE forno = ? AND lido_em >= ? GROUP BY bloco ORDER BY bloco""",
-            (passo_s, nome, iso(inicio)),
+               FROM leituras WHERE forno = ? AND lido_ts >= ? GROUP BY bloco ORDER BY bloco""",
+            (nome, int(inicio.timestamp())),
         )
         serie_leituras = [{
             "t": (r["bloco"] * passo_s + passo_s // 2) * 1000,

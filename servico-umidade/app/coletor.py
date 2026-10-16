@@ -8,6 +8,7 @@ import threading
 import time
 import urllib.request
 
+from .redis_simples import RedisSimples
 from .servico import ServicoUmidade
 
 log = logging.getLogger("coletor")
@@ -75,8 +76,19 @@ class Coletor:
         for t in self._threads:
             t.join(timeout=5)
 
+    def _ler_fonte(self):
+        """HTTP (endpoint do Node-RED) ou Redis (chave com JSON gravada pelo Node-RED)."""
+        url = self.cfg.fonte_processo_url
+        if url.startswith("redis://"):
+            cliente = RedisSimples(url, self.cfg.timeout_http_s)
+            texto = cliente.get()
+            if texto is None:
+                raise ValueError(f"chave {cliente.chave!r} vazia ou expirada no Redis (o Node-RED parou de gravar?)")
+            return json.loads(texto)
+        return buscar_json(url, self.cfg.timeout_http_s)
+
     def ler_processo_uma_vez(self) -> None:
-        dados = buscar_json(self.cfg.fonte_processo_url, self.cfg.timeout_http_s)
+        dados = self._ler_fonte()
         fornos = interpretar_fornos(dados)
         if not fornos:
             raise ValueError("resposta sem fornos")

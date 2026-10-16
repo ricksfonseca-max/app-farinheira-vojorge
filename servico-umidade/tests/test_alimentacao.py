@@ -6,7 +6,8 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
 from app import modelo
-from app.banco import Banco
+from app.banco import Banco  # noqa: F401
+from tests.base import banco_teste
 from app.coletor import interpretar_fornos
 from app.config import ConfigServico, ParametrosForno
 from app.modelo import EstadoControle, LeituraProcesso, fator_processo, fator_vapor
@@ -80,7 +81,7 @@ class TestSimulacaoRosca(unittest.TestCase):
     def rodar(self, eventos, horas=6, seguir=True):
         relogio = type("R", (), {"t": T0, "__call__": lambda self: self.t})()
         s = ServicoUmidade(ConfigServico(intervalo_leitura_s=PASSO_S, modo_inicial="conselheiro"),
-                           {"Forno 01": P}, Banco(":memory:"), relogio)
+                           {"Forno 01": P}, banco_teste(), relogio)
         f = FornoComRosca(P)
         hist = []
         for i in range(int(horas * 3600 / PASSO_S)):

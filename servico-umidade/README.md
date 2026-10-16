@@ -80,6 +80,9 @@ Com a massa de entrada 1,5 ponto mais úmida, a umidade volta para dentro da ban
 
 ## 2. Instalação
 
+> **Servidor da fábrica (`~/industria-v4`, com MySQL e Redis):** siga o roteiro passo a passo em
+> [`INSTALACAO.md`](INSTALACAO.md). O texto abaixo descreve as peças e as opções.
+
 ### 2.1 Node-RED: endpoint `/api/fornos`
 
 1. Importe `nodered/fluxo-api-fornos.json` (Menu → Import).
@@ -148,7 +151,8 @@ na rede do Docker. Os dois containers precisam estar no mesmo compose ou na mesm
 | `TOKEN_API` | – | Se definido, todos os POST exigem o cabeçalho `X-Token` |
 | `SENHA_SUPERVISOR` | – | PIN pedido na tela para mudar setpoint e modo (vazio = sem PIN) |
 | `MODO_INICIAL` | linha_base | Modo do primeiro start (`linha_base` ou `conselheiro`) |
-| `BANCO` | /dados/umidade.db | Arquivo SQLite (fica no volume `dados-umidade`) |
+| `BANCO` | /dados/umidade.db | Arquivo SQLite **ou** `mysql://usuario:senha@mysql:3306/controle_umidade` |
+| `FONTE_PROCESSO_URL` (Redis) | – | Também aceita `redis://[:senha@]redis:6379/3?chave=umidade:fornos` |
 
 ### 2.4 Parâmetros por forno: `config/fornos.json`
 
@@ -216,5 +220,5 @@ cd servico-umidade
 python -m unittest discover -s tests -t .
 ```
 
-São 64 testes, incluindo rosca dosadora, setpoint, PIN, modo e indicadores por período: tabela de vapor, regras do modelo, simulação de forno (perturbação de massa,
+São 68 testes (também rodam contra o MySQL real com `TEST_BANCO_URL`), incluindo rosca dosadora, setpoint, PIN, modo e indicadores por período: tabela de vapor, regras do modelo, simulação de forno (perturbação de massa,
 queda de vapor, operador ignorando a sugestão), sincronização com o Node-RED e a API HTTP de ponta a ponta.

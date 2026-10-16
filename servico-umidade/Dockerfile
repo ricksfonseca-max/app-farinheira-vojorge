@@ -7,9 +7,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     CONFIG_FORNOS=/app/config/fornos.json
 
 WORKDIR /app
-# Só biblioteca padrão do Python: nenhuma dependência para instalar.
+# Única dependência: PyMySQL (cliente MySQL em Python puro). Com SQLite, nem ela é usada.
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 COPY config ./config
+COPY tests ./tests
 
 RUN useradd --system --uid 1000 servico && mkdir -p /dados && chown servico /dados
 USER servico

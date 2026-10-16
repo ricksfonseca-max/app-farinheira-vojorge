@@ -18,6 +18,8 @@ services:
       # Deixe vazio se /api/registros devolver as fotos (fica pesado a cada 5 min).
       REGISTROS_URL: ""
       INTERVALO_LEITURA_S: "15"
+      # Banco: SQLite no volume (padrão) ou MySQL: "mysql://umidade:SENHA@mysql:3306/controle_umidade"
+      BANCO: "/dados/umidade.db"
       FUSO_HORARIO_PADRAO: "-03:00"
       # Se definir, configure o mesmo valor em VITE_TOKEN_UMIDADE no build do app.
       TOKEN_API: ""
