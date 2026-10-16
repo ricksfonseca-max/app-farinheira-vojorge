@@ -4,13 +4,16 @@ import { ProductionForm } from "@/components/ProductionForm";
 import { ProductionTable } from "@/components/ProductionTable";
 import { MoistureTrends } from "@/components/MoistureTrends";
 import { Header } from "@/components/Header";
+import { PainelFornos } from "@/components/PainelFornos";
 import { Loader2, ListChecks, BarChart3, LayoutDashboard } from "lucide-react";
 
 export default function Index() {
   const { records, isLoading, refetch } = useProductionRecords();
   const [activeTab, setActiveTab] = useState<'registros' | 'graficos'>('registros');
+  const [versaoFornos, setVersaoFornos] = useState(0);
 
   const handleFormSuccess = () => {
+    setVersaoFornos((v) => v + 1);
     refetch();
     setTimeout(() => refetch(), 500);
   };
@@ -28,6 +31,8 @@ export default function Index() {
             <BarChart3 size={18} /> GRÁFICOS
           </button>
         </div>
+
+        {activeTab === 'registros' && <PainelFornos atualizar={versaoFornos} />}
 
         {activeTab === 'registros' && (
            <div className="animate-in fade-in duration-500 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

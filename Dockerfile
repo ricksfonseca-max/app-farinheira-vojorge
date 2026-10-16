@@ -11,15 +11,8 @@ RUN npx vite build
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Configura o Nginx para escutar na 3000 e lidar com as rotas do React
-RUN echo 'server { \
-    listen 3000; \
-    location / { \
-        root /usr/share/nginx/html; \
-        index index.html index.htm; \
-        try_files $uri $uri/ /index.html; \
-    } \
-}' > /etc/nginx/conf.d/default.conf
+# Nginx na porta 3000: rotas do React + encaminhamento /umidade-api/ para o serviço Python
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 3000
 CMD ["nginx", "-g", "daemon off;"]

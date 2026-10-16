@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CheckCircle2, Camera, X, Loader2, Flame, Wheat, Droplets, Gauge, User, Building2, Package, Box, GripHorizontal } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { api } from "@/services/api";
+import { TEXTO_ACAO, umidadeApi } from "@/services/umidade";
 
 interface ProductionFormProps { onSubmit: () => void; }
 
@@ -84,10 +85,11 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
       if (hora >= 6 && hora < 14) turno = 1;
       else if (hora >= 14 && hora < 22) turno = 2;
 
+      const dataHora = new Date().toISOString();
       const sucesso = await api.salvar({
         responsavel, umidade: parseFloat(umidade), pressao: parseFloat(pressao),
         forno, tipo_farinha: tipoFarinha, peneira, foto: fotoString,
-        turno_num: turno, cliente, produto, ensaque
+        turno_num: turno, cliente, produto, ensaque, data_hora: dataHora
       });
 
       if (sucesso) {
@@ -99,7 +101,26 @@ export function ProductionForm({ onSubmit }: ProductionFormProps) {
         setHistPeneiras(atualizarHistorico(histPeneiras, peneira, "h_pen"));
 
         toast({ title: "Sucesso!", description: "Dados registrados." });
+
+        // Envia a amostra ao serviço de controle e mostra a sugestão de rotação.
+        // Se o serviço estiver fora, o apontamento já foi salvo e ele sincroniza depois pelo Node-RED.
+        umidadeApi
+          .registrarAmostra({ forno, umidade: parseFloat(umidade), data_hora: dataHora, tipo_farinha: tipoFarinha, peneira, responsavel })
+          .then(({ sugestao: s }) => {
+            if (!s) return;
+            const hz = s.velocidade_sugerida_hz !== null ? ` → ${s.velocidade_sugerida_hz.toFixed(1)} Hz` : "";
+            toast({ title: `${forno}: ${TEXTO_ACAO[s.acao] ?? s.acao}${hz}`, description: s.motivo, duration: 20000 });
+            onSubmit();
+          })
+          .catch((e) => console.warn("Serviço de umidade indisponível:", e));
+
         setUmidade(""); setFotoArquivo(null); setFotoPreview(null); onSubmit();
+      } else {
+        toast({
+          variant: "destructive",
+          title: "NÃO foi salvo",
+          description: "Sem conexão com o servidor. Confira a rede e toque em Registrar de novo.",
+        });
       }
     } catch (error) { toast({ variant: "destructive", title: "Erro ao salvar" });
     } finally { setIsSubmitting(false); }

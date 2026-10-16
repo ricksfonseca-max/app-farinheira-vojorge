@@ -1,0 +1,87 @@
+[
+  {
+    "id": "f0a1c0de00000001",
+    "type": "tab",
+    "label": "API Fornos (umidade)",
+    "disabled": false,
+    "info": "Este fluxo publica GET /api/fornos para o serviço Python de sugestão de umidade.\n\n1. Ligue a saída do seu nó modbus-read (que já lê o M580) na entrada do nó \"Escala leitura Modbus\".\n2. Ajuste índices e escalas nesse nó conforme o seu mapa de %MW.\n3. Teste no navegador: http://IP-DO-NODE-RED:1880/api/fornos\n\nSe a leitura parar por mais de 30 s, o endpoint devolve null e o serviço mostra SEM DADOS\n(nunca sugere rotação com dado velho)."
+  },
+  {
+    "id": "f0a1c0de00000002",
+    "type": "comment",
+    "z": "f0a1c0de00000001",
+    "name": "LEIA: ligue o modbus-read do M580 em 'Escala leitura Modbus'",
+    "info": "Este fluxo publica GET /api/fornos para o serviço Python de sugestão de umidade.\n\n1. Ligue a saída do seu nó modbus-read (que já lê o M580) na entrada do nó \"Escala leitura Modbus\".\n2. Ajuste índices e escalas nesse nó conforme o seu mapa de %MW.\n3. Teste no navegador: http://IP-DO-NODE-RED:1880/api/fornos\n\nSe a leitura parar por mais de 30 s, o endpoint devolve null e o serviço mostra SEM DADOS\n(nunca sugere rotação com dado velho).",
+    "x": 300,
+    "y": 40,
+    "wires": []
+  },
+  {
+    "id": "f0a1c0de00000003",
+    "type": "http in",
+    "z": "f0a1c0de00000001",
+    "name": "GET /api/fornos",
+    "url": "/api/fornos",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 140,
+    "y": 120,
+    "wires": [
+      [
+        "f0a1c0de00000004"
+      ]
+    ]
+  },
+  {
+    "id": "f0a1c0de00000004",
+    "type": "function",
+    "z": "f0a1c0de00000001",
+    "name": "Monta estado dos fornos",
+    "func": "// Responde GET /api/fornos para o serviço de umidade.\n// Os valores vêm das variáveis globais gravadas pelo nó \"Escala leitura Modbus\".\nconst agora = Date.now();\nconst VALIDADE_MS = 30000; // sem atualização há mais de 30 s = leitura inválida\n\nfunction forno(nome, prefixo) {\n    const lidoEm = global.get(prefixo + '_lido_em') || 0;\n    const velho = (agora - lidoEm) > VALIDADE_MS;\n    return {\n        forno: nome,\n        velocidade_hz: velho ? null : global.get(prefixo + '_hz'),\n        pressao_vapor_bar: velho ? null : global.get(prefixo + '_pressao_bar'),\n        rodando: !velho && !!global.get(prefixo + '_rodando'),\n        lido_em: lidoEm ? new Date(lidoEm).toISOString() : null\n    };\n}\n\nmsg.payload = {\n    fornos: [forno('Forno 01', 'forno1'), forno('Forno 02', 'forno2')],\n    ts: new Date(agora).toISOString()\n};\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 380,
+    "y": 120,
+    "wires": [
+      [
+        "f0a1c0de00000005"
+      ]
+    ]
+  },
+  {
+    "id": "f0a1c0de00000005",
+    "type": "http response",
+    "z": "f0a1c0de00000001",
+    "name": "",
+    "statusCode": "200",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "x": 600,
+    "y": 120,
+    "wires": []
+  },
+  {
+    "id": "f0a1c0de00000006",
+    "type": "function",
+    "z": "f0a1c0de00000001",
+    "name": "Escala leitura Modbus",
+    "func": "// Ligue aqui a saída do nó modbus-read que lê o M580 (FC3, holding registers).\n// AJUSTE os índices e as escalas para o seu mapa de %MW. Exemplo com 4 registradores (%MW100..%MW103):\n//   [0] rotação forno 1 em Hz x10   (425 = 42,5 Hz)\n//   [1] rotação forno 2 em Hz x10\n//   [2] pressão do vapor em bar x10 (manométrica; a mesma caldeira para os dois fornos)\n//   [3] status: bit0 = forno 1 girando, bit1 = forno 2 girando\nconst r = msg.payload;\nif (!Array.isArray(r) || r.length < 4) { node.warn('Leitura Modbus inesperada'); return null; }\nconst t = Date.now();\n\nglobal.set('forno1_hz', r[0] / 10);\nglobal.set('forno2_hz', r[1] / 10);\nglobal.set('forno1_pressao_bar', r[2] / 10);\nglobal.set('forno2_pressao_bar', r[2] / 10);\nglobal.set('forno1_rodando', (r[3] & 1) !== 0);\nglobal.set('forno2_rodando', (r[3] & 2) !== 0);\nglobal.set('forno1_lido_em', t);\nglobal.set('forno2_lido_em', t);\n\nnode.status({ fill: 'green', shape: 'dot',\n    text: `F1 ${r[0] / 10} Hz | F2 ${r[1] / 10} Hz | ${r[2] / 10} bar` });\nreturn null;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 380,
+    "y": 220,
+    "wires": [
+      []
+    ]
+  }
+]

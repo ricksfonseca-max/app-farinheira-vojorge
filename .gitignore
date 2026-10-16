@@ -22,3 +22,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Serviço de umidade
+__pycache__/
+*.pyc
+servico-umidade/dados/
+*.db
+*.db-wal
+*.db-shm
